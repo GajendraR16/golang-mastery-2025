@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math"
 )
 
 func main() {
@@ -14,7 +13,7 @@ func main() {
 }
 
 func isPrime(num int) bool {
-	for i := 2; i <= int(math.Sqrt(float64(num))); i++ {
+	for i := 2; i <= num>>1; i++ {
 		if num%i == 0 {
 			return false
 
