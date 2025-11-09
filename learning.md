@@ -53,11 +53,68 @@ When we check the slice address versus the underlying array address, they are di
 
 This means a slice is actually a struct that references an underlying array, not the array itself.
 
+**Slices are Non-Comparable:**
+Slices cannot be compared using the `==` operator (except for comparing to `nil`). This is because:
+- Slices contain a pointer to the underlying array
+- Comparing slices would require deep comparison of elements
+- Go doesn't provide built-in deep comparison for slices
+
+To compare slices, you must iterate through elements manually or use helper functions.
+
+**Append Functionality:**
+The `append()` function is used to add elements to a slice. Behind the scenes:
+- If the slice has sufficient capacity, `append()` adds elements to the existing underlying array
+- If capacity is exceeded, `append()` allocates a new larger array and **copies** all existing elements to it
+- The new slice is returned with updated length and capacity
+- This copy operation can be expensive for large slices
+
+Example:
+```go
+s := []int{1, 2, 3}
+s = append(s, 4, 5)  // May trigger copy if capacity exceeded
+```
+
 ### Maps
 
 Maps are Go's built-in associative data type (hash tables or dictionaries in other languages). They map keys to values and provide fast lookups.
 
 **Syntax:** `map[KeyType]ValueType`
+
+**Creating Maps:**
+```go
+// Using make
+m := make(map[string]int)
+
+// Using map literal
+m := map[string]int{"key1": 1, "key2": 2}
+```
+
+**Checking if a Key Exists:**
+Maps return two values when accessing a key: the value and a boolean indicating if the key exists.
+
+```go
+value, ok := m["key"]
+if !ok {
+    // Key doesn't exist
+}
+
+// Or compare in one line
+if val, ok := m["key"]; !ok || val != expectedValue {
+    // Key doesn't exist OR value doesn't match expected
+}
+```
+
+**Important Map Properties:**
+- Maps are **reference types** - passing a map to a function passes a reference, not a copy
+- Maps are **not safe for concurrent use** - require synchronization (mutex) for concurrent access
+- The **zero value** of a map is `nil` - a nil map behaves like an empty map for reads but causes panic on writes
+- Maps are **not comparable** using `==` (except for comparing to `nil`)
+- Iteration order is **not guaranteed** - maps iterate in random order
+
+**Deleting from Maps:**
+```go
+delete(m, "key")  // Removes key from map, safe even if key doesn't exist
+```
 
 ### Closures
 

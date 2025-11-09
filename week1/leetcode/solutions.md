@@ -6,7 +6,7 @@
 
 ```go
 func twoSum(nums []int, target int) []int {
-	m := make(map[int]int)
+	m := make(map[int]int, len(nums))
 	for idx, num := range nums {
 		if res, ok := m[target-num]; ok {
 			return []int{idx, res}
@@ -86,5 +86,44 @@ func merge(nums1 []int, m int, nums2 []int, n int)  {
         j--
         k--
     }
+}
+```
+
+## Problem 6: Contains Duplicate	
+**Link:** https://leetcode.com/problems/contains-duplicate/
+```go
+func containsDuplicate(nums []int) bool {
+	m := make(map[int]bool, len(nums)-1)
+	for _, num := range nums {
+		if m[num] {
+			return true
+		}
+		m[num] = true
+	}
+	return false
+}
+```
+
+## Problem 7: Valid Anagram
+**Link:** https://leetcode.com/problems/valid-anagram/
+```go
+func validAnagram(s, t string) bool {
+	if len(s) != len(t) {
+		return false
+	}
+
+	count := make(map[rune]int, len(s))
+
+	for _, str := range s {
+		count[str]++
+	}
+
+	for _, v := range t {
+		count[v]--
+		if count[v] < 0 {
+			return false
+		}
+	}
+	return true
 }
 ```

@@ -6,10 +6,16 @@ func main() {
 	removeDuplicates([]int{1, 1, 2})
 	removeElement([]int{3, 2, 2, 3}, 3)
 	merge([]int{1, 2, 3, 0, 0, 0}, 3, []int{2, 5, 6}, 3)
+	containsDuplicate([]int{1, 1, 1, 3, 3, 4, 3, 2, 4, 2})
+	validAnagram("rat", "cat")
 }
 
 func twoSum(nums []int, target int) []int {
-	m := make(map[int]int)
+	m := make(map[int]int, len(nums))
+	/* Adding capacity imporves performance,
+	   as it reduces the number of rehashing
+	   and growing the map multiple times
+	*/
 	for idx, num := range nums {
 		if res, ok := m[target-num]; ok {
 			return []int{idx, res}
@@ -73,4 +79,35 @@ func merge(nums1 []int, m int, nums2 []int, n int) {
 		j--
 		k--
 	}
+}
+
+func containsDuplicate(nums []int) bool {
+	m := make(map[int]bool, len(nums)-1)
+	for _, num := range nums {
+		if m[num] {
+			return true
+		}
+		m[num] = true
+	}
+	return false
+}
+
+func validAnagram(s, t string) bool {
+	if len(s) != len(t) {
+		return false
+	}
+
+	count := make(map[rune]int, len(s))
+
+	for _, str := range s {
+		count[str]++
+	}
+
+	for _, v := range t {
+		count[v]--
+		if count[v] < 0 {
+			return false
+		}
+	}
+	return true
 }
