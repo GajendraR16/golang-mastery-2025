@@ -120,11 +120,107 @@ delete(m, "key")  // Removes key from map, safe even if key doesn't exist
 
 Closures are anonymous functions that can access variables from their outer scope. They "close over" variables from the enclosing function, maintaining access to them even after the outer function returns.
 
+**Basic Closure Example:**
+```go
+func counter() func() int {
+    count := 0
+    return func() int {
+        count++  // Accesses variable from outer scope
+        return count
+    }
+}
+
+// Usage
+c := counter()
+fmt.Println(c()) // 1
+fmt.Println(c()) // 2
+```
+
+**Key Characteristics:**
+- **Variable Capture:** Closures capture variables by reference, not by value
+- **Lifetime Extension:** Variables captured by closures remain alive even after the outer function returns
+- **State Preservation:** Each closure maintains its own copy of captured variables
+
+**Common Use Cases:**
+- **Event Handlers:** Capturing context for callback functions
+- **Factory Functions:** Creating specialized functions with pre-configured behavior
+- **Iterators:** Maintaining state between function calls
+- **Decorators:** Wrapping functions with additional behavior
+
+**Variable Capture Gotcha:**
+```go
+// Common mistake - all closures capture the same variable
+funcs := make([]func(), 3)
+for i := 0; i < 3; i++ {
+    funcs[i] = func() {
+        fmt.Println(i) // All print 3 (final value of i)
+    }
+}
+
+// Correct approach - capture by value
+for i := 0; i < 3; i++ {
+    i := i  // Create new variable in loop scope
+    funcs[i] = func() {
+        fmt.Println(i) // Each prints its own value
+    }
+}
+```
+
+**Memory Considerations:**
+- Closures keep references to captured variables, preventing garbage collection
+- Be mindful of memory leaks when closures capture large objects or long-lived references
+
 ### Methods
 
 Methods are functions with a special receiver argument. They allow you to define functions on types, enabling object-oriented programming patterns in Go.
 
 **Syntax:** `func (receiver Type) methodName() returnType { }`
+
+**Value vs Pointer Receivers:**
+
+**Value Receiver:**
+```go
+func (p Person) getName() string {
+    return p.name  // Receives a copy of the struct
+}
+```
+- Method receives a **copy** of the value
+- Cannot modify the original struct
+- Use when you don't need to modify the receiver
+- More memory efficient for small structs
+
+**Pointer Receiver:**
+```go
+func (p *Person) setName(name string) {
+    p.name = name  // Modifies the original struct
+}
+```
+- Method receives a **pointer** to the original value
+- Can modify the original struct
+- Use when you need to modify the receiver or for large structs (avoids copying)
+- Required for methods that modify the receiver
+
+**Method Values and Method Expressions:**
+
+**Method Value:**
+A method bound to a specific receiver instance.
+```go
+p := Person{name: "John"}
+methodValue := p.getName  // Method bound to instance p
+result := methodValue()   // Calls p.getName()
+```
+
+**Method Expression:**
+A function that takes the receiver as its first argument.
+```go
+methodExpr := Person.getName     // Method expression
+result := methodExpr(p)          // Pass receiver as first argument
+// Equivalent to: result := p.getName()
+```
+
+Method expressions are useful for:
+- Passing methods as function arguments
+- Creating generic functions that work with different receiver types
 
 ### Interfaces
 

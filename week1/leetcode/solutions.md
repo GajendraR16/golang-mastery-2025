@@ -127,3 +127,55 @@ func validAnagram(s, t string) bool {
 	return true
 }
 ```
+
+## Problem 8: Reverse Linked List
+**Link:** https://leetcode.com/problems/reverse-linked-list/
+```go
+func reverseList(head *ListNode) *ListNode {
+	var prev *ListNode
+	curr := head
+
+	for curr != nil{
+		next := curr.Next
+		curr.Next = prev
+		prev = curr
+		curr = next
+	}
+
+	return prev
+}
+```
+
+## Problem 9: Merge Two Sorted Lists
+**Link:** https://leetcode.com/problems/merge-two-sorted-lists/
+```go
+func mergeTwoLists(list1 *ListNode, list2 *ListNode) *ListNode  {
+	dummy := &ListNode{}
+	tail := dummy
+
+	for list1 != nil && list2 != nil{
+		if list1.Val < list2.Val{
+			tail.Next = list1
+			list1 = list1.Next
+		} else {
+			tail.Next = list2
+			list2 = list2.Next
+		}
+		tail = tail.Next
+	}
+
+	for list1 != nil {
+		tail.Next = list1
+		list1 = list1.Next
+		tail = tail.Next
+	}
+
+	for list2 != nil {
+		tail.Next = list2
+		list2 = list2.Next
+		tail = tail.Next
+	}
+
+	return dummy.Next
+}
+```
