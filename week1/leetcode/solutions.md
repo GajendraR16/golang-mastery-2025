@@ -179,3 +179,46 @@ func mergeTwoLists(list1 *ListNode, list2 *ListNode) *ListNode  {
 	return dummy.Next
 }
 ```
+
+## Problem 10: Linked List Cycle
+**Link:** https://leetcode.com/problems/linked-list-cycle/
+```go
+func hasCycle(head *ListNode) bool  {
+	slow := head
+	fast := head
+
+	for fast != nil && fast.Next != nil {
+		slow = slow.Next
+		fast = fast.Next.Next
+
+		if slow == fast {
+			return true
+		}
+	}
+	return false
+}
+```
+
+## Problem 11: Remove Linked List Elements
+**Link:** https://leetcode.com/problems/remove-linked-list-elements/
+```go
+func removeElements(head *ListNode, val int) *ListNode  {
+	dummy := &ListNode{}
+	dummy.Next = head
+
+
+	prev := dummy
+	curr := head
+
+	for curr != nil {
+		if curr.Val == val {
+			prev.Next = curr.Next
+			curr = curr.Next
+		} else {
+			prev = curr
+			curr = curr.Next
+		}
+	}
+	return dummy.Next
+}
+```
