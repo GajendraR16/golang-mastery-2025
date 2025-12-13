@@ -58,8 +58,8 @@ func (l *LinkedList) Delete(value int) bool {
 }
 
 func (l *LinkedList) Search(value int) *Node {
-	if l.Head.Value == value {
-		return l.Head
+	if l.Head == nil {
+		return nil
 	}
 
 	curr := l.Head

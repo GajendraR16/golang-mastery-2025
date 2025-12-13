@@ -20,10 +20,15 @@ func LoadTasks(filename string) ([]*Task, error) {
 	if os.IsNotExist(err) {
 		return []*Task{}, nil // First run
 	}
+
 	if err != nil {
 		return nil, err
 	}
 
+	if len(data) == 0 {
+		return []*Task{}, nil
+	}
+	
 	var tasks []*Task
 	err = json.Unmarshal(data, &tasks)
 	return tasks, err

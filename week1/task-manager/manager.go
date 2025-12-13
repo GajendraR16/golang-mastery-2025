@@ -40,7 +40,9 @@ func (tm *TaskManager) Complete(id int) error {
 func (tm *TaskManager) Delete(id int) error {
 	for idx, task := range tm.Tasks {
 		if task.ID == id {
-			tm.Tasks = append(tm.Tasks[:idx], tm.Tasks[idx+1:]...)
+			// More efficient: avoid append allocation
+			copy(tm.Tasks[idx:], tm.Tasks[idx+1:])
+			tm.Tasks = tm.Tasks[:len(tm.Tasks)-1]
 			return nil
 		}
 	}
