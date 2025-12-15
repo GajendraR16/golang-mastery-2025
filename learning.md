@@ -426,6 +426,79 @@ WriteData(httpResponseWriter, data)
 - **Return Values:** Use concrete types to avoid limiting callers
 - **Proverb:** "Be conservative in what you send, be liberal in what you accept"
 
+
+## net/http Package
+
+The `net/http` package provides HTTP client and server implementations for building web applications and APIs.
+
+### HTTP Server Basics
+
+`ListenAndServe` accepts a port and a type that implements the `ServeHTTP` method. We can use `r.URL.Path` (where `r` is of type `*http.Request`) to segregate endpoints and functionality.
+
+The http package also provides `NewServeMux` which has a `.Handle` function that accepts `HandlerFunc`. `HandlerFunc` implements the `ServeHTTP` interface so we don't have to implement it for each type or endpoint. `HandlerFunc` is just a wrapper or adapter function with the signature `func(w http.ResponseWriter, r *http.Request)`.
+
+To make it convenient, http provides us with a global `ServeMux` instance, which reduces the complexity of implementation:
+
+```go
+http.HandleFunc("/", handler)
+http.ListenAndServe(":8080", nil)
+```
+
+### JSON Encoding and Decoding
+
+When building APIs, JSON encoding and decoding are essential for handling request/response data.
+
+**JSON Encoder (`json.NewEncoder`):**
+- Used to encode Go values directly to an `io.Writer` (like `http.ResponseWriter`)
+- More efficient for streaming data as it writes directly to the output
+- Commonly used for HTTP responses
+
+```go
+func jsonHandler(w http.ResponseWriter, data any) {
+    w.Header().Set("Content-Type", "application/json")
+    if err := json.NewEncoder(w).Encode(data); err != nil {
+        http.Error(w, "Failed to encode JSON", http.StatusInternalServerError)
+    }
+}
+```
+
+**JSON Decoder (`json.NewDecoder`):**
+- Used to decode JSON directly from an `io.Reader` (like `http.Request.Body`)
+- More efficient for streaming data as it reads directly from the input
+- Commonly used for parsing HTTP request bodies
+
+```go
+func parseJSON(r *http.Request, v any) error {
+    defer r.Body.Close()
+    return json.NewDecoder(r.Body).Decode(v)
+}
+```
+
+**Encoder vs Marshal / Decoder vs Unmarshal:**
+- `json.Marshal/Unmarshal`: Work with byte slices, require loading entire data into memory
+- `json.NewEncoder/NewDecoder`: Work with streams (`io.Writer`/`io.Reader`), more memory efficient
+- For HTTP handlers, Encoder/Decoder are preferred as they work directly with request/response streams
+
+**Common HTTP Response Patterns:**
+```go
+// Success response
+type Response struct {
+    Status string `json:"status"`
+    Data   any    `json:"data,omitempty"`
+}
+
+// Error response
+type ErrorResponse struct {
+    Error string `json:"error"`
+}
+
+func jsonError(w http.ResponseWriter, message string, code int) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(code)
+    json.NewEncoder(w).Encode(ErrorResponse{Error: message})
+}
+```
+
 ## Bit Operations
 
 Bit operations are fundamental operations that work directly on binary representations of numbers:
