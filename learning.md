@@ -499,6 +499,184 @@ func jsonError(w http.ResponseWriter, message string, code int) {
 }
 ```
 
+## Third-Party Routing with Gorilla Mux
+
+While Go's standard `net/http` package provides basic routing capabilities, complex APIs often require more sophisticated routing features. The Gorilla Mux package is a popular third-party router that extends Go's routing capabilities.
+
+### Why Use Gorilla Mux?
+
+**Standard Library Limitations:**
+```go
+// Standard library - basic pattern matching
+http.HandleFunc("/tasks/", taskHandler)  // Matches /tasks/anything
+```
+
+**Gorilla Mux Advantages:**
+```go
+// Gorilla Mux - precise routing with constraints
+router.HandleFunc("/tasks/{id:[0-9]+}", taskHandler).Methods("GET")
+```
+
+### Key Features
+
+**1. Path Variables with Regex Constraints:**
+```go
+// Extract ID from URL path with validation
+router.HandleFunc("/tasks/{id:[0-9]+}", taskHandler)
+
+// In handler:
+vars := mux.Vars(r)
+id, _ := strconv.Atoi(vars["id"])  // Safe conversion - regex ensures numeric
+```
+
+**2. HTTP Method Routing:**
+```go
+router.HandleFunc("/tasks", getAllTasks).Methods("GET")
+router.HandleFunc("/tasks", createTask).Methods("POST")
+router.HandleFunc("/tasks/{id}", updateTask).Methods("PUT")
+router.HandleFunc("/tasks/{id}", deleteTask).Methods("DELETE")
+```
+
+**3. Query Parameter Routing:**
+```go
+// Route based on query parameters
+router.HandleFunc("/tasks", searchTasks).Methods("GET").Queries("q", "{q}")
+router.HandleFunc("/tasks", getAllTasks).Methods("GET")  // Fallback route
+
+// Access query parameters:
+query := r.URL.Query().Get("q")
+```
+
+**4. Route Priority and Specificity:**
+```go
+// More specific routes should be registered first
+router.HandleFunc("/tasks", searchHandler).Methods("GET").Queries("q", "{q}")
+router.HandleFunc("/tasks", listHandler).Methods("GET")  // General fallback
+```
+
+### RESTful API Design Patterns
+
+The task-api demonstrates RESTful API design principles:
+
+**Resource-Based URLs:**
+- `GET /tasks` - List all tasks
+- `POST /tasks` - Create new task
+- `GET /tasks/{id}` - Get specific task
+- `PUT /tasks/{id}` - Update/complete task
+- `DELETE /tasks/{id}` - Delete task
+- `GET /tasks?q=search` - Search tasks
+
+**HTTP Status Codes:**
+```go
+// Success responses
+jsonHandler(w, http.StatusOK, data)        // 200 - Success
+jsonHandler(w, http.StatusCreated, task)   // 201 - Created
+w.WriteHeader(http.StatusNoContent)        // 204 - No Content (DELETE)
+
+// Error responses
+jsonError(w, "Not Found", http.StatusNotFound)           // 404
+jsonError(w, "Bad Request", http.StatusBadRequest)       // 400
+jsonError(w, "Internal Error", http.StatusInternalServerError) // 500
+```
+
+### Input Validation Patterns
+
+**Struct-Based Validation:**
+```go
+type TaskData struct {
+    Description string `json:"description" validate:"required,min=3"`
+}
+
+// Manual validation in handler
+task.Description = strings.TrimSpace(task.Description)
+if task.Description == "" {
+    jsonError(w, "Description cannot be empty", http.StatusBadRequest)
+    return
+}
+if len(task.Description) < 3 {
+    jsonError(w, "Description too short", http.StatusBadRequest)
+    return
+}
+```
+
+**Separation of Concerns:**
+- **Models** (`models.go`): Data structures and business logic
+- **Handlers** (`handlers.go`): HTTP request/response handling
+- **Storage** (`storage.go`): Data persistence layer
+- **Main** (`main.go`): Application setup and routing
+
+### Error Handling in APIs
+
+**Consistent Error Response Format:**
+```go
+type ErrorResponse struct {
+    Error string `json:"error"`
+}
+
+func jsonError(w http.ResponseWriter, message string, code int) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(code)
+    json.NewEncoder(w).Encode(ErrorResponse{Error: message})
+}
+```
+
+**Graceful Error Handling:**
+```go
+// Handle missing resources
+if task == nil {
+    jsonError(w, "Task Not Found", http.StatusNotFound)
+    return
+}
+
+// Handle invalid input
+if err := json.NewDecoder(r.Body).Decode(&task); err != nil {
+    jsonError(w, "Invalid JSON", http.StatusBadRequest)
+    return
+}
+```
+
+### API Response Patterns
+
+**Consistent JSON Responses:**
+```go
+func jsonHandler(w http.ResponseWriter, code int, data any) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(code)
+    if err := json.NewEncoder(w).Encode(data); err != nil {
+        http.Error(w, "Failed to encode JSON", http.StatusInternalServerError)
+    }
+}
+```
+
+**Resource Creation Pattern:**
+```go
+// POST /tasks - Return created resource with 201 status
+createdTask := tm.Add(task.Description)
+SaveTasks(tm.Tasks, filename)
+jsonHandler(w, http.StatusCreated, createdTask)
+```
+
+**Resource Deletion Pattern:**
+```go
+// DELETE /tasks/{id} - Return 204 No Content on success
+if tm.Delete(id) {
+    SaveTasks(tm.Tasks, filename)
+    w.WriteHeader(http.StatusNoContent)  // No response body needed
+    return
+}
+```
+
+### Key Learnings from Task API Implementation
+
+1. **Third-Party Routing**: Gorilla Mux provides powerful routing features beyond standard library
+2. **RESTful Design**: Consistent URL patterns and HTTP methods for resource operations
+3. **Input Validation**: Always validate and sanitize user input before processing
+4. **Error Handling**: Provide consistent, informative error responses with proper status codes
+5. **Separation of Concerns**: Organize code into logical layers (models, handlers, storage)
+6. **Resource Management**: Proper handling of request bodies with `defer r.Body.Close()`
+7. **Query Parameters**: Handle both path variables and query parameters for flexible APIs
+8. **Status Codes**: Use appropriate HTTP status codes to communicate operation results
+
 ## Bit Operations
 
 Bit operations are fundamental operations that work directly on binary representations of numbers:
