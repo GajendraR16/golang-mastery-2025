@@ -1,10 +1,12 @@
-package main
+package handler
 
 import (
 	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
+	"task-api/models"
+	"task-api/storage"
 
 	"github.com/gorilla/mux"
 )
@@ -12,7 +14,7 @@ import (
 func jsonError(w http.ResponseWriter, message string, code int) {
 	w.Header().Set("Content-type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(ErrorResponse{Error: message})
+	json.NewEncoder(w).Encode(models.ErrorResponse{Error: message})
 }
 
 func jsonHandler(w http.ResponseWriter, code int, data any) {
@@ -26,8 +28,8 @@ func jsonHandler(w http.ResponseWriter, code int, data any) {
 
 func TaskHandler(w http.ResponseWriter, r *http.Request) {
 
-	tasks, _ := LoadTasks(filename)
-	tm := NewTaskManager()
+	tasks, _ := storage.LoadTasks(storage.Filename)
+	tm := models.NewTaskManager()
 	tm.Tasks = tasks
 	jsonHandler(w, http.StatusOK, tasks)
 
@@ -35,7 +37,7 @@ func TaskHandler(w http.ResponseWriter, r *http.Request) {
 
 func CreateHandler(w http.ResponseWriter, r *http.Request) {
 
-	var task TaskData
+	var task models.TaskData
 	defer r.Body.Close()
 	if err := json.NewDecoder(r.Body).Decode(&task); err != nil {
 		jsonError(w, "Invalid Json", http.StatusBadRequest)
@@ -54,8 +56,8 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tasks, _ := LoadTasks(filename)
-	tm := NewTaskManager()
+	tasks, _ := storage.LoadTasks(storage.Filename)
+	tm := models.NewTaskManager()
 	tm.Tasks = tasks
 
 	if len(tasks) > 0 {
@@ -63,7 +65,7 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	createdTask := tm.Add(task.Description)
-	SaveTasks(tm.Tasks, filename)
+	storage.SaveTasks(tm.Tasks, storage.Filename)
 
 	jsonHandler(w, http.StatusCreated, createdTask)
 }
@@ -72,7 +74,7 @@ func TaskHandlerById(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, _ := strconv.Atoi(vars["id"]) // Regex in router ensures this is a number
 
-	tasks, _ := LoadTasks(filename)
+	tasks, _ := storage.LoadTasks(storage.Filename)
 	for _, t := range tasks {
 		if t.ID == id {
 			jsonHandler(w, http.StatusOK, t)
@@ -86,8 +88,8 @@ func TaskCompleteHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, _ := strconv.Atoi(vars["id"]) // Regex in router ensures this is a number
 
-	tasks, _ := LoadTasks(filename)
-	tm := NewTaskManager()
+	tasks, _ := storage.LoadTasks(storage.Filename)
+	tm := models.NewTaskManager()
 
 	tm.Tasks = tasks
 	task := tm.Complete(id)
@@ -97,7 +99,7 @@ func TaskCompleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	SaveTasks(tm.Tasks, filename)
+	storage.SaveTasks(tm.Tasks, storage.Filename)
 	jsonHandler(w, http.StatusOK, task)
 }
 
@@ -105,11 +107,11 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, _ := strconv.Atoi(vars["id"])
 
-	tasks, _ := LoadTasks(filename)
-	tm := NewTaskManager()
+	tasks, _ := storage.LoadTasks(storage.Filename)
+	tm := models.NewTaskManager()
 	tm.Tasks = tasks
 	if tm.Delete(id) {
-		SaveTasks(tm.Tasks, filename)
+		storage.SaveTasks(tm.Tasks, storage.Filename)
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -121,8 +123,8 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 	cleanQuery := strings.Trim(queryParam, " \"")
 	cleanQuery = strings.ToLower(cleanQuery)
 
-	tasks, _ := LoadTasks(filename)
-	tm := NewTaskManager()
+	tasks, _ := storage.LoadTasks(storage.Filename)
+	tm := models.NewTaskManager()
 	tm.Tasks = tasks
 	results := tm.Search(cleanQuery)
 	jsonHandler(w, http.StatusOK, results)

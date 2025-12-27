@@ -677,6 +677,310 @@ if tm.Delete(id) {
 7. **Query Parameters**: Handle both path variables and query parameters for flexible APIs
 8. **Status Codes**: Use appropriate HTTP status codes to communicate operation results
 
+## HTTP Middleware
+
+Middleware is a powerful pattern in web development that allows you to wrap HTTP handlers with additional functionality. Middleware functions execute before and/or after the main handler, enabling cross-cutting concerns like logging, authentication, CORS, and request validation.
+
+### Understanding Middleware Pattern
+
+**Basic Middleware Concept:**
+```go
+type Middleware func(http.Handler) http.Handler
+```
+
+A middleware is a function that takes an `http.Handler` and returns an `http.Handler`. This allows you to "wrap" handlers with additional behavior.
+
+**Simple Middleware Example:**
+```go
+func loggingMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        start := time.Now()
+        
+        // Call the next handler
+        next.ServeHTTP(w, r)
+        
+        // Log after handler completes
+        log.Printf("%s %s %v", r.Method, r.URL.Path, time.Since(start))
+    })
+}
+```
+
+### Common Middleware Patterns
+
+**1. Logging Middleware:**
+```go
+func LoggingMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        start := time.Now()
+        
+        // Create a response writer wrapper to capture status code
+        wrapped := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+        
+        next.ServeHTTP(wrapped, r)
+        
+        log.Printf("[%s] %s %s %d %v",
+            time.Now().Format("2006-01-02 15:04:05"),
+            r.Method,
+            r.URL.Path,
+            wrapped.statusCode,
+            time.Since(start),
+        )
+    })
+}
+
+type responseWriter struct {
+    http.ResponseWriter
+    statusCode int
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+    rw.statusCode = code
+    rw.ResponseWriter.WriteHeader(code)
+}
+```
+
+**2. CORS Middleware:**
+```go
+func CORSMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Access-Control-Allow-Origin", "*")
+        w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        
+        // Handle preflight requests
+        if r.Method == "OPTIONS" {
+            w.WriteHeader(http.StatusOK)
+            return
+        }
+        
+        next.ServeHTTP(w, r)
+    })
+}
+```
+
+**3. Authentication Middleware:**
+```go
+func AuthMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        token := r.Header.Get("Authorization")
+        
+        if token == "" {
+            http.Error(w, "Missing authorization header", http.StatusUnauthorized)
+            return
+        }
+        
+        // Validate token (simplified)
+        if !isValidToken(token) {
+            http.Error(w, "Invalid token", http.StatusUnauthorized)
+            return
+        }
+        
+        // Add user info to context
+        ctx := context.WithValue(r.Context(), "userID", getUserID(token))
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+```
+
+**4. Rate Limiting Middleware:**
+```go
+func RateLimitMiddleware(requestsPerMinute int) func(http.Handler) http.Handler {
+    limiter := rate.NewLimiter(rate.Limit(requestsPerMinute), requestsPerMinute)
+    
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            if !limiter.Allow() {
+                http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
+                return
+            }
+            next.ServeHTTP(w, r)
+        })
+    }
+}
+```
+
+### Middleware Chaining
+
+**Manual Chaining:**
+```go
+func main() {
+    handler := http.HandlerFunc(homeHandler)
+    
+    // Wrap with middleware (innermost first)
+    handler = loggingMiddleware(handler)
+    handler = corsMiddleware(handler)
+    handler = authMiddleware(handler)
+    
+    http.Handle("/", handler)
+}
+```
+
+**Chain Helper Function:**
+```go
+func Chain(h http.Handler, middlewares ...func(http.Handler) http.Handler) http.Handler {
+    for i := len(middlewares) - 1; i >= 0; i-- {
+        h = middlewares[i](h)
+    }
+    return h
+}
+
+// Usage
+handler := Chain(
+    http.HandlerFunc(homeHandler),
+    loggingMiddleware,
+    corsMiddleware,
+    authMiddleware,
+)
+```
+
+### Middleware with Gorilla Mux
+
+**Global Middleware:**
+```go
+router := mux.NewRouter()
+router.Use(loggingMiddleware)
+router.Use(corsMiddleware)
+
+router.HandleFunc("/api/tasks", tasksHandler)
+```
+
+**Route-Specific Middleware:**
+```go
+// Protected routes
+protected := router.PathPrefix("/api").Subrouter()
+protected.Use(authMiddleware)
+protected.HandleFunc("/tasks", tasksHandler)
+
+// Public routes
+router.HandleFunc("/health", healthHandler)
+```
+
+### Context Usage in Middleware
+
+**Passing Data Between Middleware:**
+```go
+type contextKey string
+
+const UserIDKey contextKey = "userID"
+
+func AuthMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        userID := extractUserID(r)
+        ctx := context.WithValue(r.Context(), UserIDKey, userID)
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+
+func protectedHandler(w http.ResponseWriter, r *http.Request) {
+    userID := r.Context().Value(UserIDKey).(string)
+    // Use userID in handler
+}
+```
+
+### Error Handling in Middleware
+
+**Panic Recovery Middleware:**
+```go
+func RecoveryMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        defer func() {
+            if err := recover(); err != nil {
+                log.Printf("Panic recovered: %v", err)
+                http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+            }
+        }()
+        next.ServeHTTP(w, r)
+    })
+}
+```
+
+### Middleware Best Practices
+
+**1. Order Matters:**
+```go
+// Correct order (outer to inner)
+handler = recoveryMiddleware(     // Catch panics from all inner middleware
+    loggingMiddleware(            // Log all requests
+        corsMiddleware(           // Handle CORS for all requests
+            authMiddleware(       // Authenticate specific routes
+                rateLimitMiddleware(  // Rate limit authenticated users
+                    actualHandler,
+                ),
+            ),
+        ),
+    ),
+)
+```
+
+**2. Early Returns:**
+```go
+func ValidationMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        if r.Header.Get("Content-Type") != "application/json" {
+            http.Error(w, "Content-Type must be application/json", http.StatusBadRequest)
+            return // Don't call next.ServeHTTP
+        }
+        next.ServeHTTP(w, r)
+    })
+}
+```
+
+**3. Configurable Middleware:**
+```go
+func TimeoutMiddleware(timeout time.Duration) func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            ctx, cancel := context.WithTimeout(r.Context(), timeout)
+            defer cancel()
+            next.ServeHTTP(w, r.WithContext(ctx))
+        })
+    }
+}
+
+// Usage
+handler = TimeoutMiddleware(30 * time.Second)(handler)
+```
+
+### Testing Middleware
+
+**Unit Testing Middleware:**
+```go
+func TestLoggingMiddleware(t *testing.T) {
+    // Create a test handler
+    testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
+        w.Write([]byte("test response"))
+    })
+    
+    // Wrap with middleware
+    handler := LoggingMiddleware(testHandler)
+    
+    // Create test request
+    req := httptest.NewRequest("GET", "/test", nil)
+    rr := httptest.NewRecorder()
+    
+    // Execute
+    handler.ServeHTTP(rr, req)
+    
+    // Assert
+    assert.Equal(t, http.StatusOK, rr.Code)
+    assert.Equal(t, "test response", rr.Body.String())
+}
+```
+
+### Key Middleware Concepts
+
+1. **Wrapper Pattern**: Middleware wraps handlers to add functionality
+2. **Chain of Responsibility**: Multiple middleware can be chained together
+3. **Context Propagation**: Use `context.Context` to pass data between middleware
+4. **Early Termination**: Middleware can stop the chain by not calling `next.ServeHTTP`
+5. **Order Dependency**: The order of middleware application affects behavior
+6. **Reusability**: Well-designed middleware can be reused across different routes
+7. **Separation of Concerns**: Each middleware should handle one specific concern
+8. **Performance Impact**: Middleware adds overhead, so use judiciously
+
+Middleware is essential for building robust web applications, providing a clean way to handle cross-cutting concerns without cluttering your main business logic.
+
 ## Bit Operations
 
 Bit operations are fundamental operations that work directly on binary representations of numbers:

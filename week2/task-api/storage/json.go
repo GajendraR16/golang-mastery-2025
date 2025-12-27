@@ -1,13 +1,14 @@
-package main
+package storage
 
 import (
 	"encoding/json"
 	"os"
+	"task-api/models"
 )
 
-const filename = "tasks.json"
+const Filename = "tasks.json"
 
-func SaveTasks(tasks []*Task, filename string) error {
+func SaveTasks(tasks []*models.Task, filename string) error {
 	data, err := json.MarshalIndent(tasks, "", "  ")
 	if err != nil {
 		return err
@@ -15,10 +16,10 @@ func SaveTasks(tasks []*Task, filename string) error {
 	return os.WriteFile(filename, data, 0644)
 }
 
-func LoadTasks(filename string) ([]*Task, error) {
+func LoadTasks(filename string) ([]*models.Task, error) {
 	data, err := os.ReadFile(filename)
 	if os.IsNotExist(err) {
-		return []*Task{}, nil // First run
+		return []*models.Task{}, nil // First run
 	}
 
 	if err != nil {
@@ -26,10 +27,10 @@ func LoadTasks(filename string) ([]*Task, error) {
 	}
 
 	if len(data) == 0 {
-		return []*Task{}, nil
+		return []*models.Task{}, nil
 	}
 
-	var tasks []*Task
+	var tasks []*models.Task
 	err = json.Unmarshal(data, &tasks)
 	return tasks, err
 }
