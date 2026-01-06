@@ -15,7 +15,7 @@ type Task struct {
 	Description string     `json:"description"`
 	Completed   bool       `json:"complete"`
 	CreatedAt   time.Time  `json:"created_at"`
-	CompletedAt *time.Time `json:"completed_at"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
 }
 
 func NewTask(id int, description string) *Task {

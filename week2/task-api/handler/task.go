@@ -11,6 +11,10 @@ import (
 	"github.com/gorilla/mux"
 )
 
+type App struct {
+	Store *storage.PostgresStore
+}
+
 func jsonError(w http.ResponseWriter, message string, code int) {
 	w.Header().Set("Content-type", "application/json")
 	w.WriteHeader(code)
@@ -26,16 +30,19 @@ func jsonHandler(w http.ResponseWriter, code int, data any) {
 	}
 }
 
-func TaskHandler(w http.ResponseWriter, r *http.Request) {
+func (app *App) TaskHandler(w http.ResponseWriter, r *http.Request) {
 
-	tasks, _ := storage.LoadTasks(storage.Filename)
-	tm := models.NewTaskManager()
-	tm.Tasks = tasks
-	jsonHandler(w, http.StatusOK, tasks)
+	tasks, err := app.Store.GetAllTasks()
+	if err != nil {
+		jsonError(w, err.Error(), 500)
+		return
+	}
+
+	jsonHandler(w, 200, tasks)
 
 }
 
-func CreateHandler(w http.ResponseWriter, r *http.Request) {
+func (app *App) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	var task models.TaskData
 	defer r.Body.Close()
@@ -56,74 +63,61 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tasks, _ := storage.LoadTasks(storage.Filename)
-	tm := models.NewTaskManager()
-	tm.Tasks = tasks
-
-	if len(tasks) > 0 {
-		tm.NextID = tasks[len(tasks)-1].ID + 1
+	createdTask, err := app.Store.CreateTask(task.Description)
+	if err != nil {
+		jsonError(w, "Internal Server Error", http.StatusInternalServerError)
+		return
 	}
-
-	createdTask := tm.Add(task.Description)
-	storage.SaveTasks(tm.Tasks, storage.Filename)
 
 	jsonHandler(w, http.StatusCreated, createdTask)
 }
 
-func TaskHandlerById(w http.ResponseWriter, r *http.Request) {
+func (app *App) TaskHandlerById(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, _ := strconv.Atoi(vars["id"]) // Regex in router ensures this is a number
 
-	tasks, _ := storage.LoadTasks(storage.Filename)
-	for _, t := range tasks {
-		if t.ID == id {
-			jsonHandler(w, http.StatusOK, t)
-			return
-		}
+	task, err := app.Store.GetTaskById(id)
+	if err != nil {
+		jsonError(w, err.Error(), http.StatusNotFound)
+		return
 	}
-	jsonError(w, "Task Not Found", http.StatusNotFound)
+
+	jsonHandler(w, http.StatusFound, task)
 }
 
-func TaskCompleteHandler(w http.ResponseWriter, r *http.Request) {
+func (app *App) TaskCompleteHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, _ := strconv.Atoi(vars["id"]) // Regex in router ensures this is a number
 
-	tasks, _ := storage.LoadTasks(storage.Filename)
-	tm := models.NewTaskManager()
+	task, err := app.Store.CompletedTaskById(id)
 
-	tm.Tasks = tasks
-	task := tm.Complete(id)
-
-	if task == nil {
+	if err != nil {
 		jsonError(w, "Task Not Found", http.StatusNotFound)
 		return
 	}
 
-	storage.SaveTasks(tm.Tasks, storage.Filename)
 	jsonHandler(w, http.StatusOK, task)
 }
 
-func DeleteHandler(w http.ResponseWriter, r *http.Request) {
+func (app *App) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, _ := strconv.Atoi(vars["id"])
 
-	tasks, _ := storage.LoadTasks(storage.Filename)
-	tm := models.NewTaskManager()
-	tm.Tasks = tasks
-	if tm.Delete(id) {
-		storage.SaveTasks(tm.Tasks, storage.Filename)
-		w.WriteHeader(http.StatusNoContent)
+	err := app.Store.DeleteTaskById(id)
+	if err != nil {
+		jsonError(w, "Incorrect Id", http.StatusNotFound)
 		return
 	}
-	jsonError(w, "Incorrect Id", http.StatusNotFound)
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
-func SearchHandler(w http.ResponseWriter, r *http.Request) {
+func (app *App) SearchHandler(w http.ResponseWriter, r *http.Request) {
 	queryParam := r.URL.Query().Get("q")
 	cleanQuery := strings.Trim(queryParam, " \"")
 	cleanQuery = strings.ToLower(cleanQuery)
 
-	tasks, _ := storage.LoadTasks(storage.Filename)
+	tasks, _ := app.Store.GetAllTasks()
 	tm := models.NewTaskManager()
 	tm.Tasks = tasks
 	results := tm.Search(cleanQuery)
