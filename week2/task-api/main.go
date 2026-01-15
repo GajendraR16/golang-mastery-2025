@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
+	"task-api/config"
 	"task-api/handler"
 	"task-api/middleware"
 	"task-api/storage"
@@ -14,11 +14,14 @@ import (
 func main() {
 	//Database Connection/Abstraction
 
-	connStr := "host=localhost port=5432 user=postgres password=postgres dbname=taskdb sslmode=disable"
-	store, err := storage.NewPostgresStore(connStr)
+	cfg := config.Load()
+	if cfg.DatabaseURL == "" {
+		cfg.DatabaseURL = "postgres://postgres:postgres@localhost:5432/taskdb?sslmode=disable" // Local fallback
+	}
+	store, err := storage.NewPostgresStore(cfg.DatabaseURL)
 
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Database Error", "error", err)
 	}
 
 	app := &handler.App{
@@ -40,6 +43,6 @@ func main() {
 	router.HandleFunc("/tasks/{id:[0-9]+}", app.TaskHandlerById).Methods("GET")
 	router.HandleFunc("/tasks/{id:[0-9]+}", app.DeleteHandler).Methods("DELETE")
 
-	fmt.Println("Starting server at 8080...")
-	http.ListenAndServe(":8080", router)
+	slog.Info("Starting server", "port", cfg.Port)
+	http.ListenAndServe(":"+cfg.Port, router)
 }

@@ -30,7 +30,7 @@ func (s *PostgresStore) CreateTask(description string) (*models.Task, error) {
 	query := `
 		INSERT into tasks (description)
 		VALUES ($1)
-		RETURNING id, description, completed, created_at
+		RETURNING id, description, completed, created_at, completed_at
 	`
 
 	var task models.Task
@@ -159,4 +159,8 @@ func (s *PostgresStore) DeleteTaskById(id int) error {
 
 	return nil
 
+}
+
+func (s *PostgresStore) GetDB() *sql.DB {
+	return s.db
 }
