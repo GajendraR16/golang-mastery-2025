@@ -37,17 +37,9 @@ func setupTestDB() *storage.PostgresStore {
 	return store
 }
 
-func clearTable(store *storage.PostgresStore) {
-
-	_, err := store.GetDB().Exec("TRUNCATE TABLE tasks RESTART IDENTITY CASCADE")
-	if err != nil {
-		log.Fatalf("Could not clear table: %v", err)
-	}
-}
-
 func TestGetTasks(t *testing.T) {
 
-	clearTable(testStore)
+	testStore.TruncateTasks()
 
 	// Create test data
 	testStore.CreateTask("Test task")
@@ -70,38 +62,38 @@ func TestGetTasks(t *testing.T) {
 
 func TestCreateTasks(t *testing.T) {
 
-	clearTable(testStore)
+	testStore.TruncateTasks()
 
-    // 1. Create a buffer with JSON data
-    taskData := map[string]string{"description": "New Task"}
-    body, _ := json.Marshal(taskData)
+	// 1. Create a buffer with JSON data
+	taskData := map[string]string{"description": "New Task"}
+	body, _ := json.Marshal(taskData)
 
-    // 2. Pass the body to the request
-    req := httptest.NewRequest("POST", "/tasks", bytes.NewBuffer(body))
-    req.Header.Set("Content-Type", "application/json")
-    
-    w := httptest.NewRecorder()
-    testApp.CreateHandler(w, req)
+	// 2. Pass the body to the request
+	req := httptest.NewRequest("POST", "/tasks", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
 
-    // 3. Assertions
-    if w.Code != http.StatusCreated && w.Code != http.StatusOK {
-        t.Errorf("Expected 201 or 200, got %d", w.Code)
-    }
+	w := httptest.NewRecorder()
+	testApp.CreateHandler(w, req)
 
-    var task models.Task
-    if err := json.NewDecoder(w.Body).Decode(&task); err != nil {
-        t.Errorf("Failed to decode JSON: %v", err)
-    }
+	// 3. Assertions
+	if w.Code != http.StatusCreated && w.Code != http.StatusOK {
+		t.Errorf("Expected 201 or 200, got %d", w.Code)
+	}
 
-    if task.ID != 1 {
-        t.Errorf("Expected ID 1, got %d", task.ID)
-    }
+	var task models.Task
+	if err := json.NewDecoder(w.Body).Decode(&task); err != nil {
+		t.Errorf("Failed to decode JSON: %v", err)
+	}
+
+	if task.ID != 1 {
+		t.Errorf("Expected ID 1, got %d", task.ID)
+	}
 
 }
 
 func TestCompleteHandler(t *testing.T) {
 
-	clearTable(testStore)
+	testStore.TruncateTasks()
 
 	// Create test data
 	testStore.CreateTask("Test Data Complete")
@@ -136,7 +128,7 @@ func TestCompleteHandler(t *testing.T) {
 
 func TestDeleteHandler(t *testing.T) {
 
-	clearTable(testStore)
+	testStore.TruncateTasks()
 
 	// Create test data
 	testStore.CreateTask("Test Data Delete")
@@ -169,7 +161,7 @@ func TestDeleteHandler(t *testing.T) {
 
 func TestSearchHandler(t *testing.T) {
 
-	clearTable(testStore)
+	testStore.TruncateTasks()
 
 	// Create test data
 	testStore.CreateTask("Test Data 1")
@@ -194,4 +186,31 @@ func TestSearchHandler(t *testing.T) {
 		t.Errorf("Expect 2 instead got %d", len(tasks))
 	}
 
+}
+
+func TestCreateTaskEmptyDescription(t *testing.T) {
+	testStore.TruncateTasks()
+
+	taskData := map[string]string{"description": ""}
+	body, _ := json.Marshal(taskData)
+	req := httptest.NewRequest("POST", "/tasks", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	testApp.CreateHandler(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected 400, got %d", w.Code)
+	}
+}
+
+func TestCreateTaskInvalidJSON(t *testing.T) {
+	testStore.TruncateTasks()
+	req := httptest.NewRequest("POST", "/tasks", bytes.NewBufferString("{invalid}"))
+	w := httptest.NewRecorder()
+	testApp.CreateHandler(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("Expected 400, got %d", w.Code)
+	}
 }

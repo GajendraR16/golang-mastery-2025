@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"log/slog"
 	"task-api/models"
 	"time"
 
@@ -108,6 +109,10 @@ func (s *PostgresStore) CompletedTaskById(id int) (*models.Task, error) {
 		&completedAt,
 	)
 
+	if err == sql.ErrNoRows {
+		slog.Error("task not found", "id", id)
+		return nil, sql.ErrNoRows
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -161,6 +166,33 @@ func (s *PostgresStore) DeleteTaskById(id int) error {
 
 }
 
-func (s *PostgresStore) GetDB() *sql.DB {
-	return s.db
+func (s *PostgresStore) SearchTasks(query string) ([]*models.Task, error) {
+	sqlQuery := `SELECT id, description, completed, created_at, completed_at 
+                 FROM tasks 
+                 WHERE LOWER(description) LIKE LOWER('%' || $1 || '%')`
+
+	// Use Query instead of Exec
+	rows, err := s.db.Query(sqlQuery, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tasks []*models.Task
+	for rows.Next() {
+		task := &models.Task{}
+		err := rows.Scan(&task.ID, &task.Description, &task.Completed, &task.CreatedAt, &task.CompletedAt)
+		if err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
+	}
+
+	return tasks, nil
+}
+
+func (s *PostgresStore) TruncateTasks() error {
+
+	_, err := s.db.Exec("TRUNCATE TABLE tasks RESTART IDENTITY CASCADE")
+	return err
 }
