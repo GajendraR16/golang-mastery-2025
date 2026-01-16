@@ -1,0 +1,138 @@
+# Task API
+
+A RESTful API for managing tasks built with Go, PostgreSQL, and Docker.
+
+## Features
+
+- Create, read, update, and delete tasks
+- Mark tasks as complete
+- Search tasks by description
+- PostgreSQL database with Docker support
+- CORS and logging middleware
+- Input validation
+
+## Tech Stack
+
+- **Language**: Go 1.24.5
+- **Database**: PostgreSQL 15
+- **Router**: Gorilla Mux
+- **Containerization**: Docker & Docker Compose
+
+## Project Structure
+
+```
+task-api/
+├── config/          # Configuration files
+├── handler/         # HTTP request handlers
+├── middleware/      # HTTP middleware (CORS, logging)
+├── models/          # Data models
+├── storage/         # Database layer
+├── main.go          # Application entry point
+├── schema.sql       # Database schema
+├── docker-compose.yml
+└── dockerfile
+```
+
+## Prerequisites
+
+- Go 1.24.5 or higher
+- Docker and Docker Compose
+- PostgreSQL 15 (if running locally without Docker)
+
+## Quick Start
+
+### Using Docker Compose (Recommended)
+
+1. Clone the repository and navigate to the project directory:
+```bash
+cd week2/task-api
+```
+
+2. Start the application and database:
+```bash
+docker-compose up --build
+```
+
+The API will be available at `http://localhost:8080`
+
+### Running Locally
+
+1. Start PostgreSQL:
+```bash
+# Using Docker
+docker run --name taskdb -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=taskdb -p 5432:5432 -d postgres:15
+```
+
+2. Initialize the database:
+```bash
+psql -h localhost -U postgres -d taskdb -f schema.sql
+```
+
+3. Set the database connection string (optional):
+```bash
+export DATABASE_URL="postgres://postgres:postgres@localhost:5432/taskdb?sslmode=disable"
+```
+
+4. Install dependencies:
+```bash
+go mod download
+```
+
+5. Run the application:
+```bash
+go run main.go
+```
+
+## Running Tests
+
+```bash
+# Run all tests
+go test ./...
+
+# Run tests with coverage
+go test -cover ./...
+
+# Run specific test file
+go test -v ./handler/
+```
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | `postgres://postgres:postgres@localhost:5432/taskdb?sslmode=disable` |
+
+## API Documentation
+
+See [API.md](API.md) for detailed endpoint documentation.
+
+## Database Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS tasks (
+    id SERIAL PRIMARY KEY,
+    description TEXT NOT NULL,
+    completed BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP
+);
+```
+
+## Development
+
+### Adding New Endpoints
+
+1. Define the handler in `handler/task.go`
+2. Register the route in `main.go`
+3. Add tests in `handler/handlers_test.go`
+
+### Code Organization
+
+- **handlers**: HTTP request/response logic
+- **storage**: Database operations
+- **models**: Data structures and business logic
+- **middleware**: Cross-cutting concerns (logging, CORS)
+
+## License
+
+MIT

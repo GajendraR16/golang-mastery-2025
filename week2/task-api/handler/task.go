@@ -117,10 +117,11 @@ func (app *App) SearchHandler(w http.ResponseWriter, r *http.Request) {
 	cleanQuery := strings.Trim(queryParam, " \"")
 	cleanQuery = strings.ToLower(cleanQuery)
 
-	tasks, _ := app.Store.GetAllTasks()
-	tm := models.NewTaskManager()
-	tm.Tasks = tasks
-	results := tm.Search(cleanQuery)
-	jsonHandler(w, http.StatusOK, results)
+	tasks, err := app.Store.SearchTasks(cleanQuery)
+	if err != nil {
+		jsonError(w, "Failed to fetch tasks", http.StatusInternalServerError)
+		return
+	}
+	jsonHandler(w, http.StatusOK, tasks)
 
 }
