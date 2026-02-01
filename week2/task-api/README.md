@@ -65,7 +65,7 @@ docker run --name taskdb -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=taskdb -p 
 
 2. Initialize the database:
 ```bash
-psql -h localhost -U postgres -d taskdb -f schema.sql
+docker exec -i task-db-test psql -U postgres -d taskdb < schema.sql
 ```
 
 3. Set the database connection string (optional):
@@ -84,6 +84,18 @@ go run main.go
 ```
 
 ## Running Tests
+1. Start PostgreSQL:
+```bash
+# Using Docker
+docker run --name task-db-test  -e POSTGRES_USER=postgres  -e POSTGRES_PASSWORD=postgres  -e POSTGRES_DB=taskdb_test  -p 5433:5432 -d postgres
+```
+
+2. Initialize the database:
+```bash
+docker exec -i task-db-test psql -U postgres -d taskdb_test < schema.sql
+```
+
+3. Run all tests
 
 ```bash
 # Run all tests

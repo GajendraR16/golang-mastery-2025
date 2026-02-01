@@ -115,7 +115,6 @@ func (app *App) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 func (app *App) SearchHandler(w http.ResponseWriter, r *http.Request) {
 	queryParam := r.URL.Query().Get("q")
 	cleanQuery := strings.Trim(queryParam, " \"")
-	cleanQuery = strings.ToLower(cleanQuery)
 
 	tasks, err := app.Store.SearchTasks(cleanQuery)
 	if err != nil {

@@ -981,6 +981,527 @@ func TestLoggingMiddleware(t *testing.T) {
 
 Middleware is essential for building robust web applications, providing a clean way to handle cross-cutting concerns without cluttering your main business logic.
 
+## PostgreSQL Integration in Go
+
+PostgreSQL is a powerful, open-source relational database. Go provides excellent support for PostgreSQL through the `database/sql` package and the `lib/pq` driver.
+
+### Database Connection
+
+**Basic Connection Setup:**
+```go
+import (
+    "database/sql"
+    _ "github.com/lib/pq"  // PostgreSQL driver
+)
+
+func NewPostgresStore(connStr string) (*PostgresStore, error) {
+    db, err := sql.Open("postgres", connStr)
+    if err != nil {
+        return nil, err
+    }
+    
+    // Verify connection
+    if err := db.Ping(); err != nil {
+        return nil, err
+    }
+    
+    return &PostgresStore{db: db}, nil
+}
+```
+
+**Connection String Format:**
+```
+postgres://username:password@host:port/database?sslmode=disable
+```
+
+### Repository Pattern
+
+The repository pattern abstracts database operations, providing a clean interface for data access:
+
+```go
+type PostgresStore struct {
+    db *sql.DB
+}
+
+// CRUD operations
+func (s *PostgresStore) CreateTask(description string) (*Task, error)
+func (s *PostgresStore) GetAllTasks() ([]*Task, error)
+func (s *PostgresStore) GetTaskById(id int) (*Task, error)
+func (s *PostgresStore) UpdateTask(id int) (*Task, error)
+func (s *PostgresStore) DeleteTaskById(id int) error
+```
+
+### SQL Query Patterns
+
+**1. INSERT with RETURNING:**
+```go
+func (s *PostgresStore) CreateTask(description string) (*Task, error) {
+    query := `
+        INSERT INTO tasks (description)
+        VALUES ($1)
+        RETURNING id, description, completed, created_at, completed_at
+    `
+    
+    var task Task
+    var completedAt sql.NullTime
+    
+    err := s.db.QueryRow(query, description).Scan(
+        &task.ID,
+        &task.Description,
+        &task.Completed,
+        &task.CreatedAt,
+        &completedAt,
+    )
+    
+    if completedAt.Valid {
+        task.CompletedAt = &completedAt.Time
+    }
+    
+    return &task, err
+}
+```
+
+**2. SELECT Multiple Rows:**
+```go
+func (s *PostgresStore) GetAllTasks() ([]*Task, error) {
+    query := `SELECT id, description, completed, created_at, completed_at FROM tasks`
+    
+    rows, err := s.db.Query(query)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+    
+    var tasks []*Task
+    for rows.Next() {
+        var task Task
+        var completedAt sql.NullTime
+        
+        err := rows.Scan(
+            &task.ID,
+            &task.Description,
+            &task.Completed,
+            &task.CreatedAt,
+            &completedAt,
+        )
+        if err != nil {
+            return nil, err
+        }
+        
+        if completedAt.Valid {
+            task.CompletedAt = &completedAt.Time
+        }
+        
+        tasks = append(tasks, &task)
+    }
+    
+    return tasks, rows.Err()
+}
+```
+
+**3. UPDATE with RETURNING:**
+```go
+func (s *PostgresStore) CompletedTaskById(id int) (*Task, error) {
+    query := `
+        UPDATE tasks 
+        SET completed = true, completed_at = $1 
+        WHERE id = $2
+        RETURNING id, description, completed, created_at, completed_at
+    `
+    
+    var task Task
+    var completedAt sql.NullTime
+    now := time.Now()
+    
+    err := s.db.QueryRow(query, now, id).Scan(
+        &task.ID,
+        &task.Description,
+        &task.Completed,
+        &task.CreatedAt,
+        &completedAt,
+    )
+    
+    if err == sql.ErrNoRows {
+        return nil, fmt.Errorf("task not found")
+    }
+    
+    if completedAt.Valid {
+        task.CompletedAt = &completedAt.Time
+    }
+    
+    return &task, err
+}
+```
+
+**4. DELETE with Row Count Check:**
+```go
+func (s *PostgresStore) DeleteTaskById(id int) error {
+    query := `DELETE FROM tasks WHERE id = $1`
+    
+    res, err := s.db.Exec(query, id)
+    if err != nil {
+        return err
+    }
+    
+    rowsAffected, _ := res.RowsAffected()
+    if rowsAffected == 0 {
+        return sql.ErrNoRows
+    }
+    
+    return nil
+}
+```
+
+### Handling NULL Values
+
+PostgreSQL allows NULL values, which don't map directly to Go types. Use `sql.Null*` types:
+
+```go
+var completedAt sql.NullTime
+
+err := rows.Scan(&task.ID, &task.Description, &completedAt)
+
+// Check if value is NULL
+if completedAt.Valid {
+    task.CompletedAt = &completedAt.Time  // Convert to *time.Time
+} else {
+    task.CompletedAt = nil
+}
+```
+
+**Common NULL Types:**
+- `sql.NullString` - for nullable strings
+- `sql.NullInt64` - for nullable integers
+- `sql.NullFloat64` - for nullable floats
+- `sql.NullBool` - for nullable booleans
+- `sql.NullTime` - for nullable timestamps
+
+### SQL Injection Prevention
+
+**Always use parameterized queries:**
+```go
+// ✓ Safe - parameterized query
+query := `SELECT * FROM tasks WHERE id = $1`
+rows, err := db.Query(query, userInput)
+
+// ✗ Dangerous - SQL injection vulnerability
+query := fmt.Sprintf("SELECT * FROM tasks WHERE id = %s", userInput)
+rows, err := db.Query(query)
+```
+
+PostgreSQL uses `$1, $2, $3` for parameter placeholders (not `?` like MySQL).
+
+### Error Handling
+
+**Common Database Errors:**
+```go
+import "database/sql"
+
+// No rows found
+if err == sql.ErrNoRows {
+    return nil, fmt.Errorf("task not found")
+}
+
+// Connection errors
+if err != nil {
+    log.Printf("Database error: %v", err)
+    return nil, err
+}
+
+// Check rows affected
+rowsAffected, err := result.RowsAffected()
+if rowsAffected == 0 {
+    return fmt.Errorf("no rows affected")
+}
+```
+
+### Database Schema Management
+
+**Schema Definition (schema.sql):**
+```sql
+CREATE TABLE IF NOT EXISTS tasks (
+    id SERIAL PRIMARY KEY,
+    description TEXT NOT NULL,
+    completed BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP
+);
+```
+
+**Key SQL Features:**
+- `SERIAL` - Auto-incrementing integer
+- `PRIMARY KEY` - Unique identifier
+- `DEFAULT` - Default values
+- `NOT NULL` - Required fields
+- `TIMESTAMP` - Date and time storage
+
+### Connection Pooling
+
+The `database/sql` package automatically manages a connection pool:
+
+```go
+// Configure connection pool
+db.SetMaxOpenConns(25)           // Maximum open connections
+db.SetMaxIdleConns(5)            // Maximum idle connections
+db.SetConnMaxLifetime(5 * time.Minute)  // Connection lifetime
+```
+
+**Best Practices:**
+- Don't create a new connection for each request
+- Reuse the `*sql.DB` instance across your application
+- The pool handles concurrent access automatically
+
+### Testing with PostgreSQL
+
+**Test Database Setup:**
+```go
+func setupTestDB(t *testing.T) *PostgresStore {
+    connStr := "postgres://postgres:postgres@localhost:5432/taskdb_test?sslmode=disable"
+    store, err := NewPostgresStore(connStr)
+    if err != nil {
+        t.Fatal(err)
+    }
+    return store
+}
+
+func TestCreateTask(t *testing.T) {
+    store := setupTestDB(t)
+    defer store.TruncateTasks()  // Clean up after test
+    
+    task, err := store.CreateTask("Test task")
+    if err != nil {
+        t.Fatalf("Failed to create task: %v", err)
+    }
+    
+    if task.ID == 0 {
+        t.Error("Expected task ID to be set")
+    }
+}
+```
+
+**Test Isolation:**
+- Use a separate test database
+- Truncate tables between tests
+- Use transactions that rollback for isolation
+
+### Docker Integration
+
+**Docker Compose for PostgreSQL:**
+```yaml
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: taskdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d taskdb"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+```
+
+**Benefits:**
+- Automatic schema initialization
+- Health checks for service readiness
+- Data persistence with volumes
+- Easy local development setup
+
+### Key PostgreSQL Concepts
+
+1. **Parameterized Queries**: Always use `$1, $2` placeholders to prevent SQL injection
+2. **NULL Handling**: Use `sql.Null*` types for nullable database columns
+3. **RETURNING Clause**: Get inserted/updated data in one query
+4. **Connection Pooling**: Reuse `*sql.DB` instance, don't create new connections
+5. **Error Handling**: Check for `sql.ErrNoRows` and handle connection errors
+6. **Repository Pattern**: Abstract database operations behind clean interfaces
+7. **Test Isolation**: Use separate test databases and clean up between tests
+8. **Docker Integration**: Containerize database for consistent development environment
+
+## Docker and Containerization
+
+Docker enables packaging applications with their dependencies into containers, ensuring consistent behavior across different environments.
+
+### Dockerfile Basics
+
+**Multi-Stage Build for Go:**
+```dockerfile
+# Build stage
+FROM golang:1.24.5-alpine AS builder
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN go build -o main .
+
+# Runtime stage
+FROM alpine:latest
+WORKDIR /root/
+COPY --from=builder /app/main .
+EXPOSE 8080
+CMD ["./main"]
+```
+
+**Benefits of Multi-Stage Builds:**
+- Smaller final image (only runtime dependencies)
+- Build tools not included in production image
+- Faster deployment and reduced attack surface
+
+### Docker Compose
+
+**Multi-Container Application:**
+```yaml
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: taskdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d taskdb"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/taskdb?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+```
+
+**Key Concepts:**
+- **Services**: Define containers (postgres, api)
+- **Volumes**: Persist data across container restarts
+- **Networks**: Containers can communicate by service name
+- **Health Checks**: Ensure services are ready before starting dependents
+- **depends_on**: Control startup order
+
+**Common Commands:**
+```bash
+docker-compose up --build    # Build and start all services
+docker-compose down          # Stop and remove containers
+docker-compose logs -f       # Follow logs
+docker-compose ps            # List running services
+```
+
+### Environment Configuration
+
+**Environment Variables in Docker:**
+```go
+connStr := os.Getenv("DATABASE_URL")
+if connStr == "" {
+    connStr = "postgres://localhost:5432/taskdb?sslmode=disable"  // Fallback
+}
+```
+
+**Benefits:**
+- Different configurations for dev/staging/production
+- Secrets management (passwords, API keys)
+- Easy configuration changes without rebuilding
+
+### Container Networking
+
+**Service Discovery:**
+```yaml
+api:
+  environment:
+    DATABASE_URL: postgres://postgres:postgres@postgres:5432/taskdb
+    # 'postgres' resolves to the postgres service
+```
+
+Containers in the same Docker Compose network can communicate using service names as hostnames.
+
+### Volume Management
+
+**Types of Volumes:**
+1. **Named Volumes**: Managed by Docker, persist data
+   ```yaml
+   volumes:
+     - postgres_data:/var/lib/postgresql/data
+   ```
+
+2. **Bind Mounts**: Map host directory to container
+   ```yaml
+   volumes:
+     - ./schema.sql:/docker-entrypoint-initdb.d/init.sql
+   ```
+
+**Use Cases:**
+- Named volumes: Database data persistence
+- Bind mounts: Configuration files, development code
+
+### Health Checks
+
+**PostgreSQL Health Check:**
+```yaml
+healthcheck:
+  test: ["CMD-SHELL", "pg_isready -U postgres -d taskdb"]
+  interval: 3s
+  timeout: 3s
+  retries: 5
+```
+
+**Benefits:**
+- Ensures database is ready before starting API
+- Automatic restart on failure
+- Better orchestration with `depends_on`
+
+### Docker Best Practices
+
+1. **Multi-Stage Builds**: Reduce image size
+2. **Layer Caching**: Order Dockerfile commands for efficient caching
+3. **Health Checks**: Ensure service readiness
+4. **Named Volumes**: Persist important data
+5. **Environment Variables**: Externalize configuration
+6. **Service Dependencies**: Use `depends_on` with health checks
+7. **.dockerignore**: Exclude unnecessary files from build context
+
+### Development Workflow
+
+**Local Development:**
+```bash
+# Start all services
+docker-compose up --build
+
+# View logs
+docker-compose logs -f api
+
+# Execute commands in container
+docker-compose exec api sh
+
+# Stop services
+docker-compose down
+
+# Remove volumes (clean slate)
+docker-compose down -v
+```
+
+**Benefits:**
+- Consistent environment across team
+- Easy onboarding for new developers
+- No need to install PostgreSQL locally
+- Isolated development environment
+
 ## Bit Operations
 
 Bit operations are fundamental operations that work directly on binary representations of numbers:
