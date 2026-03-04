@@ -62,10 +62,12 @@ The API will be available at `http://localhost:8080`
 # Using Docker
 docker run --name taskdb -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=taskdb -p 5432:5432 -d postgres:15
 ```
+If port `5432` is already used on your machine, map to another host port (example `5434:5432`) and update `DATABASE_URL` accordingly.
 
 2. Initialize the database:
 ```bash
-docker exec -i task-db-test psql -U postgres -d taskdb < schema.sql
+docker exec taskdb pg_isready -U postgres
+docker exec -i taskdb psql -U postgres -d taskdb < schema.sql
 ```
 
 3. Set the database connection string (optional):
@@ -92,6 +94,7 @@ docker run --name task-db-test  -e POSTGRES_USER=postgres  -e POSTGRES_PASSWORD=
 
 2. Initialize the database:
 ```bash
+docker exec task-db-test pg_isready -U postgres
 docker exec -i task-db-test psql -U postgres -d taskdb_test < schema.sql
 ```
 
@@ -135,7 +138,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 ### Adding New Endpoints
 
 1. Define the handler in `handler/task.go`
-2. Register the route in `main.go`
+2. Register the route in `server/router.go`
 3. Add tests in `handler/handlers_test.go`
 
 ### Code Organization
@@ -144,6 +147,30 @@ CREATE TABLE IF NOT EXISTS tasks (
 - **storage**: Database operations
 - **models**: Data structures and business logic
 - **middleware**: Cross-cutting concerns (logging, CORS)
+
+## Troubleshooting
+
+- `container name "/taskdb" is already in use`:
+```bash
+docker rm -f taskdb
+```
+
+- `failed to bind host port 0.0.0.0:5432 ... address already in use`:
+```bash
+docker run --name taskdb -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=taskdb -p 5434:5432 -d postgres:15
+export DATABASE_URL="postgres://postgres:postgres@localhost:5434/taskdb?sslmode=disable"
+```
+
+- `container ... is not running`:
+```bash
+docker start task-db-test
+```
+
+- `psql: ... No such file or directory` right after starting container:
+```bash
+docker exec task-db-test pg_isready -U postgres
+docker exec -i task-db-test psql -U postgres -d taskdb_test < schema.sql
+```
 
 ## License
 

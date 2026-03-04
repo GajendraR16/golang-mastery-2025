@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
+	"log"
 	"log/slog"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"task-api/config"
-	"task-api/handler"
-	"task-api/middleware"
+	"task-api/server"
 	"task-api/storage"
-
-	"github.com/gorilla/mux"
+	"time"
 )
 
 func main() {
@@ -16,33 +19,48 @@ func main() {
 
 	cfg := config.Load()
 	if cfg.DatabaseURL == "" {
-		cfg.DatabaseURL = "postgres://postgres:postgres@localhost:5432/taskdb?sslmode=disable" // Local fallback
+		cfg.DatabaseURL = "postgres://postgres:postgres@localhost:5433/taskdb?sslmode=disable" // Local fallback
 	}
 	store, err := storage.NewPostgresStore(cfg.DatabaseURL)
 
 	if err != nil {
 		slog.Error("Database Error", "error", err)
 	}
+	defer store.Close()
 
-	app := &handler.App{
-		Store: store,
+	//Setup Router
+	router := server.SetupRouter(store)
+
+	//Configure server
+	srv := &http.Server{
+		Addr:         ":" + cfg.Port,
+		Handler:      router,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
-	router := mux.NewRouter()
+	// Start server
+	go func() {
+		log.Printf("Server starting on port %s", cfg.Port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server error: %v", err)
+		}
+	}()
 
-	router.Use(middleware.LoggingMiddleware)
-	router.Use(middleware.CorsMiddleware)
-	// Specific Route First
-	router.HandleFunc("/tasks", app.SearchHandler).Methods("GET").Queries("q", "{q}")
+	// Wait for interrupt
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
 
-	//General Route
-	router.HandleFunc("/tasks", app.TaskHandler).Methods("GET")
+	log.Println("Server is shutting down...")
 
-	router.HandleFunc("/tasks", app.CreateHandler).Methods("POST")
-	router.HandleFunc("/tasks/{id:[0-9]+}", app.TaskCompleteHandler).Methods("PUT")
-	router.HandleFunc("/tasks/{id:[0-9]+}", app.TaskHandlerById).Methods("GET")
-	router.HandleFunc("/tasks/{id:[0-9]+}", app.DeleteHandler).Methods("DELETE")
+	// Graceful shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatal("Server forced to shutdown:", err)
+	}
+	log.Println("Server stopped gracefully")
 
-	slog.Info("Starting server", "port", cfg.Port)
-	http.ListenAndServe(":"+cfg.Port, router)
 }

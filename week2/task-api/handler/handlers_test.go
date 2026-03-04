@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -27,7 +28,7 @@ func init() {
 
 func setupTestDB() *storage.PostgresStore {
 
-	connStr := "postgres://postgres:postgres@localhost:5432/taskdb_test?sslmode=disable"
+	connStr := "postgres://postgres:postgres@localhost:5433/taskdb_test?sslmode=disable"
 	store, err := storage.NewPostgresStore(connStr)
 
 	if err != nil {
@@ -39,10 +40,11 @@ func setupTestDB() *storage.PostgresStore {
 
 func TestGetTasks(t *testing.T) {
 
-	testStore.TruncateTasks()
+	ctx := context.Background()
+	testStore.TruncateTasks(ctx)
 
 	// Create test data
-	testStore.CreateTask("Test task")
+	testStore.CreateTask(ctx, "Test task")
 
 	// Make request
 	req := httptest.NewRequest("GET", "/tasks", nil)
@@ -62,7 +64,8 @@ func TestGetTasks(t *testing.T) {
 
 func TestCreateTasks(t *testing.T) {
 
-	testStore.TruncateTasks()
+	ctx := context.Background()
+	testStore.TruncateTasks(ctx)
 
 	// 1. Create a buffer with JSON data
 	taskData := map[string]string{"description": "New Task"}
@@ -93,10 +96,11 @@ func TestCreateTasks(t *testing.T) {
 
 func TestCompleteHandler(t *testing.T) {
 
-	testStore.TruncateTasks()
+	ctx := context.Background()
+	testStore.TruncateTasks(ctx)
 
 	// Create test data
-	testStore.CreateTask("Test Data Complete")
+	testStore.CreateTask(ctx, "Test Data Complete")
 
 	// Make request
 	req := httptest.NewRequest("PUT", "/tasks/1", nil)
@@ -128,10 +132,11 @@ func TestCompleteHandler(t *testing.T) {
 
 func TestDeleteHandler(t *testing.T) {
 
-	testStore.TruncateTasks()
+	ctx := context.Background()
+	testStore.TruncateTasks(ctx)
 
 	// Create test data
-	testStore.CreateTask("Test Data Delete")
+	testStore.CreateTask(ctx, "Test Data Delete")
 
 	// Make request
 	req := httptest.NewRequest("DELETE", "/tasks/1", nil)
@@ -161,11 +166,12 @@ func TestDeleteHandler(t *testing.T) {
 
 func TestSearchHandler(t *testing.T) {
 
-	testStore.TruncateTasks()
+	ctx := context.Background()
+	testStore.TruncateTasks(ctx)
 
 	// Create test data
-	testStore.CreateTask("Test Data 1")
-	testStore.CreateTask("Test Data 2")
+	testStore.CreateTask(ctx, "Test Data 1")
+	testStore.CreateTask(ctx, "Test Data 2")
 
 	// Make request
 	req := httptest.NewRequest("GET", "/tasks/?q=Test", nil)
@@ -189,7 +195,8 @@ func TestSearchHandler(t *testing.T) {
 }
 
 func TestCreateTaskEmptyDescription(t *testing.T) {
-	testStore.TruncateTasks()
+	ctx := context.Background()
+	testStore.TruncateTasks(ctx)
 
 	taskData := map[string]string{"description": ""}
 	body, _ := json.Marshal(taskData)
@@ -205,7 +212,8 @@ func TestCreateTaskEmptyDescription(t *testing.T) {
 }
 
 func TestCreateTaskInvalidJSON(t *testing.T) {
-	testStore.TruncateTasks()
+	ctx := context.Background()
+	testStore.TruncateTasks(ctx)
 	req := httptest.NewRequest("POST", "/tasks", bytes.NewBufferString("{invalid}"))
 	w := httptest.NewRecorder()
 	testApp.CreateHandler(w, req)
