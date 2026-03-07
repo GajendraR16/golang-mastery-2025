@@ -388,3 +388,261 @@ Separate `taskdb_test` database for testing
 - Implement caching
 - Use prepared statements
 - Add query optimization
+
+## Concurrency Patterns
+
+### Context-Aware Operations
+
+The API implements context-aware database operations for better resource management and cancellation support:
+
+```go
+func (s *PostgresStore) CreateTask(ctx context.Context, description string) (*Task, error) {
+    query := `INSERT INTO tasks (description) VALUES ($1) RETURNING ...`
+    err := s.db.QueryRowContext(ctx, query, description).Scan(...)
+    return &task, err
+}
+```
+
+**Benefits**:
+- Request cancellation propagation
+- Timeout handling
+- Resource cleanup
+- Distributed tracing support
+
+### Batch Create with Goroutines
+
+Batch create uses goroutines in the handler for concurrent processing:
+
+```go
+func (app *App) processBatch(ctx context.Context, tasks []models.TaskData) BatchResponse {
+    var wg sync.WaitGroup
+    sem := make(chan struct{}, 10)
+
+    for _, task := range tasks {
+        wg.Add(1)
+        go func(t models.TaskData) {
+            defer wg.Done()
+            sem <- struct{}{}
+            defer func() { <-sem }()
+
+            // validate + app.Store.CreateTask(ctx, ...)
+        }(task)
+    }
+    wg.Wait()
+    return response
+}
+```
+
+### Worker Pool Pattern
+
+For high-throughput scenarios, the API can implement worker pools:
+
+```go
+type TaskProcessor struct {
+    workers   int
+    taskQueue chan TaskJob
+    results   chan TaskResult
+    wg        sync.WaitGroup
+}
+
+func NewTaskProcessor(workers int) *TaskProcessor {
+    return &TaskProcessor{
+        workers:   workers,
+        taskQueue: make(chan TaskJob, workers*2),
+        results:   make(chan TaskResult, workers*2),
+    }
+}
+
+func (tp *TaskProcessor) Start(ctx context.Context) {
+    for i := 0; i < tp.workers; i++ {
+        tp.wg.Add(1)
+        go tp.worker(ctx)
+    }
+}
+
+func (tp *TaskProcessor) worker(ctx context.Context) {
+    defer tp.wg.Done()
+    for {
+        select {
+        case job := <-tp.taskQueue:
+            result := tp.processTask(ctx, job)
+            tp.results <- result
+        case <-ctx.Done():
+            return
+        }
+    }
+}
+```
+
+### Database Connection Pooling
+
+PostgreSQL connections are managed with built-in pooling:
+
+```go
+func NewPostgresStore(connStr string) (*PostgresStore, error) {
+    db, err := sql.Open("postgres", connStr)
+    if err != nil {
+        return nil, err
+    }
+    
+    // Configure connection pool
+    db.SetMaxOpenConns(25)                 // Maximum open connections
+    db.SetMaxIdleConns(5)                  // Maximum idle connections
+    db.SetConnMaxLifetime(5 * time.Minute) // Connection lifetime
+    
+    return &PostgresStore{db: db}, nil
+}
+```
+
+### Graceful Shutdown
+
+The server implements graceful shutdown with context cancellation:
+
+```go
+func main() {
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()
+    
+    server := &http.Server{
+        Addr:    ":8080",
+        Handler: router,
+    }
+    
+    // Start server in goroutine
+    go func() {
+        if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+            log.Fatalf("Server failed: %v", err)
+        }
+    }()
+    
+    // Wait for interrupt signal
+    sigChan := make(chan os.Signal, 1)
+    signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+    <-sigChan
+    
+    // Graceful shutdown with timeout
+    shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer shutdownCancel()
+    
+    if err := server.Shutdown(shutdownCtx); err != nil {
+        log.Printf("Server shutdown error: %v", err)
+    }
+}
+```
+
+### Rate Limiting with Channels
+
+Implement rate limiting using channel-based semaphores:
+
+```go
+type RateLimiter struct {
+    semaphore chan struct{}
+    rate      time.Duration
+}
+
+func NewRateLimiter(maxConcurrent int, rate time.Duration) *RateLimiter {
+    return &RateLimiter{
+        semaphore: make(chan struct{}, maxConcurrent),
+        rate:      rate,
+    }
+}
+
+func (rl *RateLimiter) Allow(ctx context.Context) error {
+    select {
+    case rl.semaphore <- struct{}{}:
+        go func() {
+            time.Sleep(rl.rate)
+            <-rl.semaphore
+        }()
+        return nil
+    case <-ctx.Done():
+        return ctx.Err()
+    }
+}
+```
+
+### Concurrent Safety Patterns
+
+**Mutex for Shared State**:
+```go
+type SafeCounter struct {
+    mu    sync.RWMutex
+    count map[string]int
+}
+
+func (sc *SafeCounter) Increment(key string) {
+    sc.mu.Lock()
+    defer sc.mu.Unlock()
+    sc.count[key]++
+}
+
+func (sc *SafeCounter) Get(key string) int {
+    sc.mu.RLock()
+    defer sc.mu.RUnlock()
+    return sc.count[key]
+}
+```
+
+**Channel-Based Communication**:
+```go
+type TaskNotifier struct {
+    subscribers []chan TaskEvent
+    mu          sync.RWMutex
+}
+
+func (tn *TaskNotifier) Subscribe() <-chan TaskEvent {
+    tn.mu.Lock()
+    defer tn.mu.Unlock()
+    
+    ch := make(chan TaskEvent, 10)
+    tn.subscribers = append(tn.subscribers, ch)
+    return ch
+}
+
+func (tn *TaskNotifier) Notify(event TaskEvent) {
+    tn.mu.RLock()
+    defer tn.mu.RUnlock()
+    
+    for _, ch := range tn.subscribers {
+        select {
+        case ch <- event:
+        default: // Non-blocking send
+        }
+    }
+}
+```
+
+### Performance Monitoring
+
+**Concurrent Metrics Collection**:
+```go
+type Metrics struct {
+    requests    int64
+    errors      int64
+    avgDuration int64
+}
+
+func (m *Metrics) RecordRequest(duration time.Duration, err error) {
+    atomic.AddInt64(&m.requests, 1)
+    if err != nil {
+        atomic.AddInt64(&m.errors, 1)
+    }
+    
+    // Update average duration using atomic operations
+    currentAvg := atomic.LoadInt64(&m.avgDuration)
+    newAvg := (currentAvg + duration.Nanoseconds()) / 2
+    atomic.StoreInt64(&m.avgDuration, newAvg)
+}
+```
+
+### Key Concurrency Benefits
+
+1. **Scalability**: Handle multiple requests simultaneously
+2. **Responsiveness**: Non-blocking operations with timeouts
+3. **Resource Efficiency**: Connection pooling and worker pools
+4. **Fault Tolerance**: Graceful degradation and error isolation
+5. **Observability**: Concurrent metrics and logging
+6. **Cancellation**: Context-based request cancellation
+7. **Backpressure**: Rate limiting and queue management
+
+These patterns enable the Task API to handle high-concurrency scenarios while maintaining data consistency and system stability.

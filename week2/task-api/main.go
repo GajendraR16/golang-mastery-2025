@@ -1,48 +1,67 @@
 package main
 
 import (
+	"context"
+	"log"
 	"log/slog"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"task-api/config"
-	"task-api/handler"
-	"task-api/middleware"
+	"task-api/server"
 	"task-api/storage"
-
-	"github.com/gorilla/mux"
+	"time"
 )
 
 func main() {
 	//Database Connection/Abstraction
 
 	cfg := config.Load()
-	if cfg.DatabaseURL == "" {
-		cfg.DatabaseURL = "postgres://postgres:postgres@localhost:5432/taskdb?sslmode=disable" // Local fallback
-	}
 	store, err := storage.NewPostgresStore(cfg.DatabaseURL)
 
 	if err != nil {
 		slog.Error("Database Error", "error", err)
+		os.Exit(1)
+	}
+	defer store.Close()
+
+	//Setup Router
+	router := server.SetupRouter(store)
+
+	//Configure server
+	srv := &http.Server{
+		Addr:         ":" + cfg.Port,
+		Handler:      router,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
-	app := &handler.App{
-		Store: store,
+	// Start server
+	go func() {
+		slog.Info("Server starting", slog.String("port", cfg.Port))
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("Server error", slog.String("error", err.Error()))
+			os.Exit(1)
+		}
+	}()
+
+	slog.Info("Server ready - Press Ctrl+C to shutdown")
+
+	// Wait for interrupt
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Server is shutting down...")
+
+	// Graceful shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		slog.Error("Server forced to shutdown:", slog.String("error", err.Error()))
 	}
+	slog.Info("Server stopped gracefully")
 
-	router := mux.NewRouter()
-
-	router.Use(middleware.LoggingMiddleware)
-	router.Use(middleware.CorsMiddleware)
-	// Specific Route First
-	router.HandleFunc("/tasks", app.SearchHandler).Methods("GET").Queries("q", "{q}")
-
-	//General Route
-	router.HandleFunc("/tasks", app.TaskHandler).Methods("GET")
-
-	router.HandleFunc("/tasks", app.CreateHandler).Methods("POST")
-	router.HandleFunc("/tasks/{id:[0-9]+}", app.TaskCompleteHandler).Methods("PUT")
-	router.HandleFunc("/tasks/{id:[0-9]+}", app.TaskHandlerById).Methods("GET")
-	router.HandleFunc("/tasks/{id:[0-9]+}", app.DeleteHandler).Methods("DELETE")
-
-	slog.Info("Starting server", "port", cfg.Port)
-	http.ListenAndServe(":"+cfg.Port, router)
 }
