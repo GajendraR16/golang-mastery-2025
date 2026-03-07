@@ -18,9 +18,6 @@ func main() {
 	//Database Connection/Abstraction
 
 	cfg := config.Load()
-	if cfg.DatabaseURL == "" {
-		cfg.DatabaseURL = "postgres://postgres:postgres@localhost:5432/taskdb?sslmode=disable" // Local fallback
-	}
 	store, err := storage.NewPostgresStore(cfg.DatabaseURL)
 
 	if err != nil {
@@ -43,11 +40,14 @@ func main() {
 
 	// Start server
 	go func() {
-		log.Printf("Server starting on port %s", cfg.Port)
+		slog.Info("Server starting", slog.String("port", cfg.Port))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server error: %v", err)
+			slog.Error("Server error", slog.String("error", err.Error()))
+			os.Exit(1)
 		}
 	}()
+
+	slog.Info("Server ready - Press Ctrl+C to shutdown")
 
 	// Wait for interrupt
 	quit := make(chan os.Signal, 1)
@@ -60,8 +60,8 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatal("Server forced to shutdown:", err)
+		slog.Error("Server forced to shutdown:", slog.String("error", err.Error()))
 	}
-	log.Println("Server stopped gracefully")
+	slog.Info("Server stopped gracefully")
 
 }
