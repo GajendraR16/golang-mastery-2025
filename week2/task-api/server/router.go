@@ -20,11 +20,17 @@ func SetupRouter(store *storage.PostgresStore) *mux.Router {
 	router.Use(middleware.LoggingMiddleware)
 	router.Use(middleware.CorsMiddleware)
 	router.Use(middleware.TimeoutMiddleware(time.Second * 2))
+	//Health Route
+	router.HandleFunc("/health", app.HealthHandler).Methods("GET")
+
 	// Specific Route First
 	router.HandleFunc("/tasks", app.SearchHandler).Methods("GET").Queries("q", "{q}")
 
 	//General Route
 	router.HandleFunc("/tasks", app.TaskHandler).Methods("GET")
+
+	//Batch Route
+	router.HandleFunc("/tasks/batch", app.BatchCreateHandler).Methods("POST")
 
 	router.HandleFunc("/tasks", app.CreateHandler).Methods("POST")
 	router.HandleFunc("/tasks/{id:[0-9]+}", app.TaskCompleteHandler).Methods("PUT")

@@ -19,12 +19,13 @@ func main() {
 
 	cfg := config.Load()
 	if cfg.DatabaseURL == "" {
-		cfg.DatabaseURL = "postgres://postgres:postgres@localhost:5433/taskdb?sslmode=disable" // Local fallback
+		cfg.DatabaseURL = "postgres://postgres:postgres@localhost:5432/taskdb?sslmode=disable" // Local fallback
 	}
 	store, err := storage.NewPostgresStore(cfg.DatabaseURL)
 
 	if err != nil {
 		slog.Error("Database Error", "error", err)
+		os.Exit(1)
 	}
 	defer store.Close()
 

@@ -7,9 +7,13 @@ A RESTful API for managing tasks built with Go, PostgreSQL, and Docker.
 - Create, read, update, and delete tasks
 - Mark tasks as complete
 - Search tasks by description
+- Batch create operation for multiple tasks
+- Context-aware database operations
 - PostgreSQL database with Docker support
 - CORS and logging middleware
 - Input validation
+- Comprehensive test suite
+- Makefile for development workflow
 
 ## Tech Stack
 
@@ -30,7 +34,7 @@ task-api/
 ├── main.go          # Application entry point
 ├── schema.sql       # Database schema
 ├── docker-compose.yml
-└── dockerfile
+└── Dockerfile
 ```
 
 ## Prerequisites
@@ -50,65 +54,118 @@ cd week2/task-api
 
 2. Start the application and database:
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 The API will be available at `http://localhost:8080`
 
-### Running Locally
+### Using Makefile (Recommended)
 
-1. Start PostgreSQL:
 ```bash
-# Using Docker
-docker run --name taskdb -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=taskdb -p 5432:5432 -d postgres:15
+cd week2/task-api
+make up
 ```
-If port `5432` is already used on your machine, map to another host port (example `5434:5432`) and update `DATABASE_URL` accordingly.
 
-2. Initialize the database:
+Useful targets:
+
 ```bash
-docker exec taskdb pg_isready -U postgres
+make down
+make logs
+make local-db-up
+make local-db-init
+make run
+make test-db-up
+make test-db-init
+make test
+make clean
+```
+
+### Running Locally (With Makefile)
+
+1. Start local Postgres for the app:
+```bash
+make local-db-up
+make local-db-init
+```
+
+2. Set connection string and run API:
+```bash
+export DATABASE_URL="postgres://postgres:postgres@localhost:5434/taskdb?sslmode=disable"
+export PORT=8080
+make run
+```
+
+3. Cleanup:
+```bash
+make local-db-down
+```
+
+### Running Locally (Manual Sequence)
+
+1. Check what is using Postgres default port:
+```bash
+docker ps --format 'table {{.Names}}\t{{.Ports}}' | rg 5432
+ss -ltn 'sport = :5432'
+```
+
+2. Start Postgres on an available host port (example `5434`):
+```bash
+docker rm -f taskdb 2>/dev/null || true
+docker run --name taskdb -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=taskdb -p 5434:5432 -d postgres:15
+```
+
+3. Wait for DB and initialize schema:
+```bash
+docker exec taskdb pg_isready -U postgres -d taskdb
 docker exec -i taskdb psql -U postgres -d taskdb < schema.sql
 ```
 
-3. Set the database connection string (optional):
+4. Set connection string and run API:
 ```bash
-export DATABASE_URL="postgres://postgres:postgres@localhost:5432/taskdb?sslmode=disable"
-```
-
-4. Install dependencies:
-```bash
-go mod download
-```
-
-5. Run the application:
-```bash
+export DATABASE_URL="postgres://postgres:postgres@localhost:5434/taskdb?sslmode=disable"
+export PORT=8080
 go run main.go
 ```
 
-## Running Tests
-1. Start PostgreSQL:
+5. Cleanup:
 ```bash
-# Using Docker
-docker run --name task-db-test  -e POSTGRES_USER=postgres  -e POSTGRES_PASSWORD=postgres  -e POSTGRES_DB=taskdb_test  -p 5433:5432 -d postgres
+docker rm -f taskdb
+```
+
+## Running Tests
+1. Start PostgreSQL for tests:
+```bash
+make test-db-up
 ```
 
 2. Initialize the database:
 ```bash
-docker exec task-db-test pg_isready -U postgres
-docker exec -i task-db-test psql -U postgres -d taskdb_test < schema.sql
+make test-db-init
 ```
 
 3. Run all tests
 
 ```bash
-# Run all tests
-go test ./...
+make test
 
-# Run tests with coverage
-go test -cover ./...
+# Optional
+make test-cover
+make test-handler
+```
 
-# Run specific test file
-go test -v ./handler/
+4. Cleanup:
+```bash
+make test-db-down
+```
+
+One-command flow (setup + test + cleanup):
+```bash
+make test-with-db
+```
+
+If Docker requires sudo on your system, avoid `sudo make` and run:
+```bash
+make test-with-db DOCKER="sudo docker"
 ```
 
 ## Environment Variables
@@ -120,6 +177,11 @@ go test -v ./handler/
 ## API Documentation
 
 See [API.md](API.md) for detailed endpoint documentation.
+
+### Batch Endpoint Scope
+
+- `POST /tasks/batch` currently supports batch **create only**
+- Batch **update** (`PUT`) and batch **delete** (`DELETE`) are not implemented in this version
 
 ## Database Schema
 
@@ -159,6 +221,13 @@ docker rm -f taskdb
 ```bash
 docker run --name taskdb -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=taskdb -p 5434:5432 -d postgres:15
 export DATABASE_URL="postgres://postgres:postgres@localhost:5434/taskdb?sslmode=disable"
+```
+
+- `dial tcp 127.0.0.1:5434: connect: connection refused`:
+```bash
+docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' | rg 5434
+docker start taskdb
+docker exec taskdb pg_isready -U postgres -d taskdb
 ```
 
 - `container ... is not running`:

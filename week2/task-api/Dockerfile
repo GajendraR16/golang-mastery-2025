@@ -1,5 +1,3 @@
-# DockerFile
-
 FROM golang:1.24.5-alpine AS builder
 
 WORKDIR /app
@@ -16,4 +14,4 @@ WORKDIR /root
 COPY --from=builder /app/task-api .
 
 EXPOSE 8080
-CMD [ "./task-api" ]
+CMD ["./task-api"]

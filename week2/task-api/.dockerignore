@@ -1,0 +1,7 @@
+.git
+.gitignore
+README.md
+API.md
+ARCHITECTURE.md
+scripts/
+**/*_test.go

@@ -47,7 +47,7 @@ Retrieve a specific task by its ID.
 **Parameters**:
 - `id` (path parameter): Task ID (integer)
 
-**Response**: `302 Found`
+**Response**: `200 OK`
 
 ```json
 {
@@ -92,7 +92,7 @@ Create a new task.
 - Minimum length: 3 characters
 - Whitespace is trimmed
 
-**Response**: `201 Created`
+**Response**: `200 OK`
 
 ```json
 {
@@ -230,6 +230,103 @@ curl "http://localhost:8080/tasks?q=groceries"
 
 ---
 
+### 7. Batch Create Tasks
+
+Create multiple tasks in a single request.
+
+**Endpoint**: `POST /tasks/batch`
+
+**Request Body**:
+```json
+{
+  "tasks": [
+    {"description": "Task 1"},
+    {"description": "Task 2"},
+    {"description": "Task 3"}
+  ]
+}
+```
+
+**Validation Rules**:
+- `tasks` array is required
+- Each task must have a `description`
+- Maximum 100 tasks per batch
+- Each description must be at least 3 characters
+
+**Response**: `200 OK`
+
+```json
+{
+  "created": [
+    {
+      "id": 1,
+      "description": "Task 1",
+      "complete": false,
+      "created_at": "2026-01-15T12:00:00Z",
+      "completed_at": null
+    },
+    {
+      "id": 2,
+      "description": "Task 2",
+      "complete": false,
+      "created_at": "2026-01-15T12:00:01Z",
+      "completed_at": null
+    }
+  ],
+  "failed": [],
+  "stats": {
+    "total": 3,
+    "success": 2,
+    "failed": 1,
+    "duration_ms": 12
+  }
+}
+```
+
+**Error Responses**:
+
+`400 Bad Request` - Invalid batch size:
+```json
+{
+  "error": "Task count must be 1 to 100"
+}
+```
+
+`400 Bad Request` - Empty or missing tasks array:
+```json
+{
+  "error": "Task count must be 1 to 100"
+}
+```
+
+**Example**:
+```bash
+curl -X POST http://localhost:8080/tasks/batch \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tasks": [
+      {"description": "Learn Go concurrency"},
+      {"description": "Build REST API"},
+      {"description": "Write documentation"}
+    ]
+  }'
+```
+
+---
+
+### 8. Batch Endpoint Scope
+
+Current implementation supports batch create only:
+
+- `POST /tasks/batch`
+
+Not implemented in this version:
+
+- Batch complete (`PUT /tasks/batch/complete`)
+- Batch delete (`DELETE /tasks/batch`)
+
+---
+
 ## Error Handling
 
 All error responses follow this format:
@@ -247,7 +344,6 @@ All error responses follow this format:
 | 200 | OK - Request succeeded |
 | 201 | Created - Resource created successfully |
 | 204 | No Content - Request succeeded with no response body |
-| 302 | Found - Resource found |
 | 400 | Bad Request - Invalid input |
 | 404 | Not Found - Resource not found |
 | 500 | Internal Server Error - Server error |
@@ -264,19 +360,30 @@ curl -X POST http://localhost:8080/tasks \
   -H "Content-Type: application/json" \
   -d '{"description": "Learn Go programming"}'
 
-# 2. Get all tasks
+# 2. Create multiple tasks at once
+curl -X POST http://localhost:8080/tasks/batch \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tasks": [
+      {"description": "Study concurrency"},
+      {"description": "Build API"},
+      {"description": "Write tests"}
+    ]
+  }'
+
+# 3. Get all tasks
 curl http://localhost:8080/tasks
 
-# 3. Get specific task (replace {id} with actual ID)
+# 4. Get specific task (replace {id} with actual ID)
 curl http://localhost:8080/tasks/1
 
-# 4. Search for tasks
+# 5. Search for tasks
 curl "http://localhost:8080/tasks?q=programming"
 
-# 5. Mark task as complete
+# 6. Mark task as complete
 curl -X PUT http://localhost:8080/tasks/1
 
-# 6. Delete task
+# 7. Delete task
 curl -X DELETE http://localhost:8080/tasks/1
 ```
 

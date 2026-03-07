@@ -9,6 +9,7 @@ import (
 	"strings"
 	"task-api/models"
 	"task-api/storage"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -90,8 +91,13 @@ func (app *App) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 func (app *App) TaskHandlerById(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	id, _ := strconv.Atoi(vars["id"]) // Regex in router ensures this is a number
+	id, err := strconv.Atoi(vars["id"]) // Regex in router ensures this is a number
 
+	if err != nil {
+		slog.Warn("Invalid ID", "id", vars["id"], "error", err.Error())
+		jsonError(w, "Invalid task id", http.StatusBadRequest, err)
+		return
+	}
 	task, err := app.Store.GetTaskById(r.Context(), id)
 	if err != nil {
 		if err == context.DeadlineExceeded {
@@ -102,12 +108,17 @@ func (app *App) TaskHandlerById(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	jsonHandler(w, http.StatusFound, task)
+	jsonHandler(w, http.StatusOK, task)
 }
 
 func (app *App) TaskCompleteHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	id, _ := strconv.Atoi(vars["id"]) // Regex in router ensures this is a number
+	id, err := strconv.Atoi(vars["id"]) // Regex in router ensures this is a number
+	if err != nil {
+		slog.Warn("Invalid ID", "id", vars["id"], "error", err.Error())
+		jsonError(w, "Invalid task id", http.StatusBadRequest, err)
+		return
+	}
 
 	task, err := app.Store.CompletedTaskById(r.Context(), id)
 
@@ -125,9 +136,14 @@ func (app *App) TaskCompleteHandler(w http.ResponseWriter, r *http.Request) {
 
 func (app *App) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	id, _ := strconv.Atoi(vars["id"])
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		slog.Warn("Invalid ID", "id", vars["id"], "error", err.Error())
+		jsonError(w, "Invalid task id", http.StatusBadRequest, err)
+		return
+	}
 
-	err := app.Store.DeleteTaskById(r.Context(), id)
+	err = app.Store.DeleteTaskById(r.Context(), id)
 	if err != nil {
 		if err == context.DeadlineExceeded {
 			jsonError(w, "Database query timeout", http.StatusRequestTimeout, err)
@@ -155,4 +171,32 @@ func (app *App) SearchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonHandler(w, http.StatusOK, tasks)
 
+}
+
+func (app *App) HealthHandler(w http.ResponseWriter, r *http.Request) {
+	stats := app.Store.Stats()
+
+	health := map[string]any{
+		"status": "healthy",
+		"database": map[string]any{
+			"open_connections":    stats.OpenConnections,
+			"in_use":              stats.InUse,
+			"idle":                stats.Idle,
+			"wait_count":          stats.WaitCount,
+			"wait_duration_ms":    stats.WaitDuration.Milliseconds(),
+			"max_idle_closed":     stats.MaxIdleClosed,
+			"max_lifetime_closed": stats.MaxLifetimeClosed,
+		},
+	}
+
+	// Check if database is actually reachable
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+	if err := app.Store.GetDB().PingContext(ctx); err != nil {
+		health["status"] = "unhealthy"
+		health["error"] = err.Error()
+		jsonHandler(w, http.StatusServiceUnavailable, health)
+		return
+	}
+	jsonHandler(w, http.StatusOK, health)
 }
