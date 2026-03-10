@@ -12,6 +12,10 @@ A structured roadmap and collection of projects, notes, and exercises to achieve
 - **Simple API**: Basic HTTP server implementation with Go's standard library
 - **Task API**: RESTful API with PostgreSQL, Docker, and advanced routing
 
+### Week 3
+- **Concurrency Basics**: Goroutines, channels, select, pipelines, and worker patterns
+- **Connection Pool Test**: Database connection pooling behavior and concurrency testing
+
 ## Projects
 
 ### Task Manager CLI (`week1/task-manager/`)
@@ -72,6 +76,31 @@ docker-compose up --build
 - [API.md](week2/task-api/API.md) - Complete API documentation
 - [ARCHITECTURE.md](week2/task-api/ARCHITECTURE.md) - Architecture overview
 
+### Concurrency Basics (`week3/concurrency-basics/`)
+Hands-on Go concurrency exercises and patterns.
+
+**Includes:**
+- Basic goroutine usage
+- Channel communication
+- `select` pattern
+- Pipeline pattern
+- Worker pattern
+
+**Run:**
+```bash
+cd week3/concurrency-basics
+go run .
+```
+
+### Connection Pool Test (`week3/connection-pool-test/`)
+Experiments for understanding DB connection pool behavior under concurrent load.
+
+**Run:**
+```bash
+cd week3/connection-pool-test
+go run .
+```
+
 ## Learning Progress
 
 ### Week 1
@@ -98,3 +127,15 @@ docker-compose up --build
 - ✅ Environment configuration
 - ✅ API documentation
 - ✅ Integration testing
+
+### Week 3
+- ✅ Goroutines and concurrency fundamentals
+- ✅ Channels (buffered and unbuffered)
+- ✅ `select` for multiplexing and cancellation
+- ✅ Fan-in / fan-out and pipeline patterns
+- ✅ Worker pool pattern
+- ✅ Semaphore-style concurrency limiting
+- ✅ Context propagation and timeout handling
+- ✅ Graceful shutdown concepts
+- ✅ Structured logging basics
+- ✅ Connection pooling experiments

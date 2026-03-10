@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package task;
+
+option go_package = "grpc-basics/proto";
+
+message Task {
+    int32 id = 1;
+    string description = 2;
+    bool completed = 3;
+    string created_at = 4;
+}
+
+message CreateTaskRequest {
+    string description = 1;
+}
+
+message CreateTaskResponse {
+    Task task = 1;
+}
+
+message GetTaskRequest {
+    int32 id = 1;
+}
+
+message GetTaskResponse {
+    Task task = 1;
+}
+
+message ListTaskRequest {
+}
+
+message ListTaskResponse {
+  repeated Task tasks = 1;
+}
+
+service TaskService {
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
+  rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
+  rpc ListTask(ListTaskRequest) returns (ListTaskResponse);
+}
