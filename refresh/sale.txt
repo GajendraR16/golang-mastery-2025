@@ -1,0 +1,14 @@
+food, 10
+food,5
+toys, 20
+food, 15
+toys,8
+
+books,30
+food,notanumber
+toys
+food,7,extra
+    drinks , 12
+BOOKS,5
+toys,-3
+food,0
