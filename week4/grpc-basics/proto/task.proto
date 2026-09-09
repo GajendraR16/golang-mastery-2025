@@ -4,11 +4,14 @@ package task;
 
 option go_package = "grpc-basics/proto";
 
+// --- Messages ---
+
 message Task {
-    int32 id = 1;
+    int32  id          = 1;
     string description = 2;
-    bool completed = 3;
-    string created_at = 4;
+    bool   completed   = 3;
+    string created_at  = 4;
+    string completed_at = 5;
 }
 
 message CreateTaskRequest {
@@ -27,15 +30,25 @@ message GetTaskResponse {
     Task task = 1;
 }
 
-message ListTaskRequest {
+message ListTasksRequest {}
+
+message ListTasksResponse {
+    repeated Task tasks = 1;  // repeated = slice
 }
 
-message ListTaskResponse {
-  repeated Task tasks = 1;
+message CompleteTaskRequest {
+  int32 id = 1;
 }
+
+message CompleteTaskResponse {
+    Task task = 1;
+}
+
+// --- Service ---
 
 service TaskService {
-  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
-  rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
-  rpc ListTask(ListTaskRequest) returns (ListTaskResponse);
+    rpc CreateTask (CreateTaskRequest) returns (CreateTaskResponse);
+    rpc GetTask    (GetTaskRequest)    returns (GetTaskResponse);
+    rpc ListTasks  (ListTasksRequest)  returns (ListTasksResponse);
+    rpc CompleteTask (CompleteTaskRequest) returns (CompleteTaskResponse);
 }
