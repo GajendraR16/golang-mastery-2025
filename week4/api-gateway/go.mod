@@ -1,10 +1,13 @@
-module grpc-basics
+module api-gateway
 
 go 1.26.4
 
 require (
+	github.com/gorilla/mux v1.8.1
 	google.golang.org/grpc v1.83.2
 	google.golang.org/protobuf v1.36.12
+	grpc-basics v0.0.0-00010101000000-000000000000
+	user-service v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -13,3 +16,7 @@ require (
 	golang.org/x/text v0.41.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 )
+
+replace grpc-basics => ../grpc-basics
+
+replace user-service => ../user-service

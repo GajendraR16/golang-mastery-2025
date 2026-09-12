@@ -1,4 +1,4 @@
-module grpc-basics
+module user-service
 
 go 1.26.4
 
