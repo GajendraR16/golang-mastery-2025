@@ -1,0 +1,30 @@
+services:
+  networks:
+  grpc-net:
+    driver: bridge
+  task-service:
+    networks:
+      - grpc-net
+    build:
+      context: ./grpc-basics
+      dockerfile: Dockerfile
+  user-service:
+    networks:
+      - grpc-net
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+  api-gateway:
+    networks:
+      - grpc-net
+    depends_on:
+    - task-service
+    - user-service
+    build:
+      context: .
+      dockerfile: ./api-gateway/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      TASK_SERVICE_ADDR: task-service:50051
+      USER_SERVICE_ADDR: user-service:50052

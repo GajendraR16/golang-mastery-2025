@@ -52,6 +52,7 @@ func (s *taskServer) CreateTask(ctx context.Context, req *pb.CreateTaskRequest) 
 		Description: req.Description,
 		Completed:   false,
 		CreatedAt:   time.Now().Format(time.RFC3339),
+		UserId:      req.UserId,
 	}
 
 	s.tasks[s.nextID] = task
@@ -86,7 +87,7 @@ func (s *taskServer) ListTasks(ctx context.Context, req *pb.ListTasksRequest) (*
 	return &pb.ListTasksResponse{Tasks: tasks}, nil
 }
 
-func (s *taskServer) CompleteTasks(ctx context.Context, req *pb.CompleteTaskRequest) (*pb.CompleteTaskResponse, error) {
+func (s *taskServer) CompleteTask(ctx context.Context, req *pb.CompleteTaskRequest) (*pb.CompleteTaskResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

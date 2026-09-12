@@ -28,6 +28,7 @@ type Task struct {
 	Completed     bool                   `protobuf:"varint,3,opt,name=completed,proto3" json:"completed,omitempty"`
 	CreatedAt     string                 `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	CompletedAt   string                 `protobuf:"bytes,5,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+	UserId        int32                  `protobuf:"varint,6,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -97,9 +98,17 @@ func (x *Task) GetCompletedAt() string {
 	return ""
 }
 
+func (x *Task) GetUserId() int32 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
 type CreateTaskRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Description   string                 `protobuf:"bytes,1,opt,name=description,proto3" json:"description,omitempty"`
+	UserId        int32                  `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -139,6 +148,13 @@ func (x *CreateTaskRequest) GetDescription() string {
 		return x.Description
 	}
 	return ""
+}
+
+func (x *CreateTaskRequest) GetUserId() int32 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
 }
 
 type CreateTaskResponse struct {
@@ -445,16 +461,18 @@ var File_proto_task_proto protoreflect.FileDescriptor
 
 const file_proto_task_proto_rawDesc = "" +
 	"\n" +
-	"\x10proto/task.proto\x12\x04task\"\x98\x01\n" +
+	"\x10proto/task.proto\x12\x04task\"\xb1\x01\n" +
 	"\x04Task\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x1c\n" +
 	"\tcompleted\x18\x03 \x01(\bR\tcompleted\x12\x1d\n" +
 	"\n" +
 	"created_at\x18\x04 \x01(\tR\tcreatedAt\x12!\n" +
-	"\fcompleted_at\x18\x05 \x01(\tR\vcompletedAt\"5\n" +
+	"\fcompleted_at\x18\x05 \x01(\tR\vcompletedAt\x12\x17\n" +
+	"\auser_id\x18\x06 \x01(\x05R\x06userId\"N\n" +
 	"\x11CreateTaskRequest\x12 \n" +
-	"\vdescription\x18\x01 \x01(\tR\vdescription\"4\n" +
+	"\vdescription\x18\x01 \x01(\tR\vdescription\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\x05R\x06userId\"4\n" +
 	"\x12CreateTaskResponse\x12\x1e\n" +
 	"\x04task\x18\x01 \x01(\v2\n" +
 	".task.TaskR\x04task\" \n" +

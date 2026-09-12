@@ -12,10 +12,12 @@ message Task {
     bool   completed   = 3;
     string created_at  = 4;
     string completed_at = 5;
+    int32  user_id     = 6;
 }
 
 message CreateTaskRequest {
     string description = 1;
+    int32  user_id     = 2;
 }
 
 message CreateTaskResponse {
