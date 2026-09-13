@@ -45,7 +45,7 @@ jobs:
       - name: Build Linux binary
         working-directory: ./week2/task-api
         run: |
-          GOOS=linux GOARCH=amd64 go build -o task-api .
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o task-api .
 
       - name: Copy Files via SCP
         uses: appleboy/scp-action@v1.0.0
