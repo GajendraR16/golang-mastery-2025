@@ -30,7 +30,7 @@ func init() {
 func setupTestDB() *storage.PostgresStore {
 
 	connStr := "postgres://postgres:postgres@localhost:5433/taskdb_test?sslmode=disable"
-	store, err := storage.NewPostgresStore(connStr)
+	store, err := storage.NewPostgresStore(connStr, 10)
 
 	if err != nil {
 		log.Fatalf("Failed to connect to test DB: %v", err)

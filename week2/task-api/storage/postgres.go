@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"task-api/models"
 	"time"
@@ -14,23 +15,32 @@ type PostgresStore struct {
 	db *sql.DB
 }
 
-func NewPostgresStore(connStr string) (*PostgresStore, error) {
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		return nil, err
+func NewPostgresStore(connStr string, maxRetries int) (*PostgresStore, error) {
+	var db *sql.DB
+	var err error
+
+	for i := 0; i < maxRetries; i++ {
+		db, err = sql.Open("postgres", connStr)
+		if err == nil {
+			if err = db.Ping(); err == nil {
+				// ✅ Configure pool before returning
+				db.SetMaxOpenConns(25)
+				db.SetMaxIdleConns(25)
+				db.SetConnMaxLifetime(5 * time.Minute)
+				db.SetConnMaxIdleTime(10 * time.Minute)
+
+				return &PostgresStore{db: db}, nil // ✅ correct return type
+			}
+		}
+
+		slog.Warn("DB not ready, retrying...",
+			slog.Int("attempt", i+1),
+			slog.Int("max", maxRetries),
+		)
+		time.Sleep(3 * time.Second)
 	}
 
-	//Configure connection pool
-	db.SetMaxOpenConns(25)
-	db.SetConnMaxLifetime(5 * time.Minute)
-	db.SetConnMaxIdleTime(10 * time.Minute)
-
-	if err := db.Ping(); err != nil {
-		return nil, err
-	}
-
-	return &PostgresStore{db: db}, nil
-
+	return nil, fmt.Errorf("failed to connect after %d attempts: %w", maxRetries, err)
 }
 
 func (s *PostgresStore) CreateTask(ctx context.Context, description string) (*models.Task, error) {
