@@ -43,8 +43,9 @@ jobs:
         run: go test ./...
 
       - name: Build Linux binary
+        working-directory: ./week2/task-api
         run: |
-          GOOS=linux GOARCH=amd64 go build -o task-api-linux ./week2/task-api
+          GOOS=linux GOARCH=amd64 go build -o task-api-linux .
 
       - name: Copy Files via SCP
         uses: appleboy/scp-action@v1.0.0
@@ -52,7 +53,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_KEY }}
-          source: "task-api-linux"
+          source: "week2/task-api/task-api-linux"
           target: "/home/ec2-user/"
 
       - name: Execute Remote SSH Commands
