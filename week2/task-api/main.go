@@ -18,7 +18,7 @@ func main() {
 	//Database Connection/Abstraction
 
 	cfg := config.Load()
-	store, err := storage.NewPostgresStore(cfg.DatabaseURL)
+	store, err := storage.NewPostgresStore(cfg.DatabaseURL, 10)
 
 	if err != nil {
 		slog.Error("Database Error", "error", err)
