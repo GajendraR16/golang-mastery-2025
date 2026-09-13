@@ -55,6 +55,7 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           source: "week2/task-api/task-api-linux"
           target: "/home/ec2-user/"
+          strip_components: 2
 
       - name: Execute Remote SSH Commands
         uses: appleboy/ssh-action@v1.2.0
