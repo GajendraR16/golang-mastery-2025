@@ -26,7 +26,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: uses: actions/checkout@v4.2.2
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -66,3 +66,6 @@ jobs:
           script: |
             sudo systemctl restart task-api
             sudo systemctl status task-api --no-pager
+      
+      - name: Notify
+        run: echo "Deployed successfully at $(date)"

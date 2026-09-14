@@ -1,6 +1,8 @@
 package server
 
 import (
+	"encoding/json"
+	"net/http"
 	"task-api/handler"
 	"task-api/middleware"
 	"task-api/storage"
@@ -36,6 +38,12 @@ func SetupRouter(store *storage.PostgresStore) *mux.Router {
 	router.HandleFunc("/tasks/{id:[0-9]+}", app.TaskCompleteHandler).Methods("PUT")
 	router.HandleFunc("/tasks/{id:[0-9]+}", app.TaskHandlerById).Methods("GET")
 	router.HandleFunc("/tasks/{id:[0-9]+}", app.DeleteHandler).Methods("DELETE")
+
+	// Add to your API if not already there
+	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	}).Methods("GET")
 
 	return router
 }
